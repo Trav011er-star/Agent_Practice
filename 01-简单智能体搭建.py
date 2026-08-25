@@ -147,6 +147,7 @@ class OpenAICompatibleClient:
 
 
 import re
+from dotenv import load_dotenv
 
 if __name__ == "__main__":
     city = "东莞"
@@ -164,11 +165,15 @@ if __name__ == "__main__":
 
     # --- 1. 配置LLM客户端 ---
     # 请根据您使用的服务，将这里替换成对应的凭证和地址
-    API_KEY = "AQ.Ab8RN6KUI139M1meMYvbMv_O45SYe3Qi_SgTftDiezZyY53acg"
-    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    MODEL_ID = "gemini-3.5-flash-lite"
-    TAVILY_API_KEY = "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"
-    os.environ["TAVILY_API_KEY"] = TAVILY_API_KEY
+
+    # 加载当前 Python 文件旁边的 .env
+    env_path = ".env"
+    load_dotenv(env_path)
+
+    API_KEY = os.environ.get("LLM_API_KEY")
+    BASE_URL = os.environ.get("LLM_BASE_URL")
+    MODEL_ID = os.environ.get("LLM_MODEL")
+    TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
     llm = OpenAICompatibleClient(model=MODEL_ID, api_key=API_KEY, base_url=BASE_URL)
 
