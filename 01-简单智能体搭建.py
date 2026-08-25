@@ -82,11 +82,9 @@ def get_attraction(city: str, weather: str) -> str:
     """
     # 1. 从环境变量中读取API密钥
     # 程序访问 Tavily 服务时使用的账号密码
-    # api_key = os.environ.get("TAVILY_API_KEY")
-    # if not api_key:
-    #     return "错误:未配置TAVILY_API_KEY环境变量。"
-
-    api_key = "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"
+    api_key = os.environ.get("TAVILY_API_KEY")
+    if not api_key:
+        return "错误:未配置TAVILY_API_KEY环境变量。"
 
     # 2. 初始化Tavily客户端
     tavily = TavilyClient(api_key=api_key)
@@ -117,6 +115,39 @@ def get_attraction(city: str, weather: str) -> str:
         return f"错误:执行Tavily搜索时出现问题 - {e}"
 
 
+from openai import OpenAI
+
+
+class OpenAICompatibleClient:
+    """
+    一个用于调用任何兼容OpenAI接口的LLM服务的客户端。
+    """
+
+    def __init__(self, model: str, api_key: str, base_url: str):
+        self.model = model
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
+
+    def generate(self, prompt: str, system_prompt: str) -> str:
+        """调用LLM API来生成回应。"""
+        print("正在调用大语言模型...")
+        try:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+            response = self.client.chat.completions.create(
+                model=self.model, messages=messages, stream=False
+            )
+            answer = response.choices[0].message.content
+            print("大语言模型响应成功。")
+            return answer
+        except Exception as e:
+            print(f"调用LLM API时发生错误: {e}")
+            return "错误:调用语言模型服务时出错。"
+
+
+import re
+
 if __name__ == "__main__":
     city = "东莞"
     weather = get_weather(city)
@@ -130,3 +161,86 @@ if __name__ == "__main__":
         "get_weather": get_weather,
         "get_attraction": get_attraction,
     }
+
+    # --- 1. 配置LLM客户端 ---
+    # 请根据您使用的服务，将这里替换成对应的凭证和地址
+    API_KEY = "AQ.Ab8RN6KUI139M1meMYvbMv_O45SYe3Qi_SgTftDiezZyY53acg"
+    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    MODEL_ID = "gemini-3.5-flash-lite"
+    TAVILY_API_KEY = "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"
+    os.environ["TAVILY_API_KEY"] = TAVILY_API_KEY
+
+    llm = OpenAICompatibleClient(model=MODEL_ID, api_key=API_KEY, base_url=BASE_URL)
+
+    # --- 2. 初始化 ---
+    user_prompt = (
+        "你好，请帮我查询一下今天北京的天气，然后根据天气推荐一个合适的旅游景点。"
+    )
+    prompt_history = [f"用户请求: {user_prompt}"]
+
+    print(f"用户输入: {user_prompt}\n" + "=" * 40)
+
+    # --- 3. 运行主循环 ---
+    for i in range(5):  # 设置最大循环次数
+        print(f"--- 循环 {i + 1} ---\n")
+
+        # 3.1. 构建Prompt
+        full_prompt = "\n".join(prompt_history)
+        print(f"本次完整的提示词：{full_prompt}")
+
+        # 3.2. 调用LLM进行思考
+        # System Prompt（系统提示词）：
+        # 在调用大语言模型时预先提供的一组全局指令，
+        # 用于规定模型的身份、任务目标、行为规则、可用工具和输出格式。
+        # 它相当于智能体的“工作说明书”，用于约束模型应该如何分析和回应用户请求。
+        llm_output = llm.generate(full_prompt, system_prompt=AGENT_SYSTEM_PROMPT)
+        print(f"LLM思考结果：{llm_output}")
+
+        # 模型可能会输出多余的Thought-Action，需要截断
+        # match = re.search(
+        #     r"(Thought:.*?Action:.*?)(?=\n\s*(?:Thought:|Action:|Observation:)|\Z)",
+        #     llm_output,
+        #     re.DOTALL,
+        # )
+        # if match:
+        #     truncated = match.group(1).strip()
+        #     if truncated != llm_output.strip():
+        #         llm_output = truncated
+        #         print("已截断多余的 Thought-Action 对")
+        # print(f"模型输出:\n{llm_output}\n")
+        # prompt_history.append(llm_output)
+
+        # 3.3. 解析并执行行动
+        # 匹配模型思考后决定的执行行动
+        action_match = re.search(r"Action: (.*)", llm_output, re.DOTALL)
+        if not action_match:
+            observation = "错误: 未能解析到 Action 字段。请确保你的回复严格遵循 'Thought: ... Action: ...' 的格式。"
+            observation_str = f"Observation: {observation}"
+            print(f"{observation_str}\n" + "=" * 40)
+            prompt_history.append(observation_str)
+            continue
+        action_str = action_match.group(1).strip()
+
+        # 如果模型决定的行动是结束
+        if action_str.startswith("Finish"):
+            final_answer = re.match(r"Finish\[(.*)\]", action_str).group(1)
+            print(f"任务完成，最终答案: {final_answer}")
+            break
+
+        # 匹配文字得到模型决定使用的函数工具
+        tool_name = re.search(r"(\w+)\(", action_str).group(1)
+        args_str = re.search(r"\((.*)\)", action_str).group(1)
+        kwargs = dict(re.findall(r'(\w+)="([^"]*)"', args_str))
+
+        if tool_name in available_tools:
+            # available_tools[tool_name] = 函数方法
+            # (**kwargs) = 方法内要传入的参数
+            observation = available_tools[tool_name](**kwargs)
+            print(f"调用工具{tool_name}，传入参数{kwargs}")
+        else:
+            observation = f"错误:未定义的工具 '{tool_name}'"
+
+        # 3.4. 记录观察结果
+        observation_str = f"Observation: {observation}"
+        print(f"{observation_str}\n" + "=" * 40)
+        prompt_history.append(observation_str)
