@@ -116,6 +116,8 @@ def get_attraction(city: str, weather: str) -> str:
 
 
 from openai import OpenAI
+# 从 openai 这个 SDK 中导入 OpenAI 类
+# SDK: 服务商为开发者准备的一套代码库
 
 
 class OpenAICompatibleClient:
