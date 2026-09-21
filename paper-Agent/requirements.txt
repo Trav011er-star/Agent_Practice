@@ -1,0 +1,4 @@
+langchain
+langchain-community
+pymupdf
+langchain_text_splitters
