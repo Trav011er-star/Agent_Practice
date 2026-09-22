@@ -4,6 +4,9 @@ from src.embedding import create_vector_store, load_vector_store
 from src.llm import get_llm_model
 from langchain_core.prompts import ChatPromptTemplate
 
+# 将 llm 的输出直接转为可读的字符串(否则需要 response.content)
+from langchain_core.output_parsers import StrOutputParser
+
 # Runnable：LangChain 对“可执行组件”的统一抽象。
 # 一个 Runnable 可以接收输入、执行处理，并返回输出。
 
@@ -23,7 +26,8 @@ from langchain_core.runnables import (
     RunnablePassthrough,
 )
 
-# RAG: Retrieval-Augmented Generation：
+# RAG_v1: Retrieval-Augmented Generation
+# 单轮 RAG
 
 pdf_path = "data/papers/Attention Is All You Need.pdf"
 
@@ -214,12 +218,13 @@ def RAG_workflow():
         # 将 prompt.invoke(dict) 的输出作为 llm.invoke() 的输入
         | llm
         # llm.invoke() 的输出作为 chain 的输出
+        | StrOutputParser()
     )
 
     # 封装完成的 Langchain，只需给入 query 即可得到 RAG 的输出结果
     response = chain.invoke(query)
     print("\n===== LLM Response =====")
-    print(response.content)
+    print(response)
 
 
 if __name__ == "__main__":
