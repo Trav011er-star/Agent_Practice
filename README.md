@@ -1,341 +1,1130 @@
 # Agent Practice
 
-一个面向智能体开发入门的 Python 学习项目。
+面向 **LLM / RAG / AI Agent 应用开发** 的个人学习与项目实践仓库。
 
-本仓库从最基础的实现出发，不依赖 LangChain、LlamaIndex 等 Agent 框架，直接使用 Python 手动搭建一个能够调用天气查询和网络搜索工具的智能旅行助手，用于理解 LLM、工具、记忆与 Agent 控制循环之间的关系。
+本仓库用于记录我从大语言模型基础原理，到 RAG、Agent、LangChain、LangGraph、MCP 等 AI 应用开发技术的学习过程，并通过完整项目逐步将理论知识转化为工程实践能力。
 
-## 项目目标
+当前重点：
 
-通过一个“查询天气并推荐旅游景点”的任务，理解简单智能体的核心组成：
+> 🚧 **Paper Agent：基于 LangChain + Ollama + Chroma 构建论文 RAG / Conversational RAG 系统**
 
-- LLM 负责理解请求并决定下一步行动；
-- System Prompt 规定智能体的身份、任务、工具和输出协议；
-- Python 本地程序负责解析并执行 LLM 选择的工具；
-- 外部 API 为智能体提供实时天气和网络搜索能力；
-- Observation 将工具执行结果反馈给 LLM；
-- Agent Loop 重复上述过程，直到模型输出最终答案。
+---
 
-## 智能体与普通 LLM 调用的区别
-
-普通 LLM 调用通常只包含一次“输入 → 输出”：
+# 📌 Learning Roadmap
 
 ```text
-用户问题 → LLM → 文本回答
+LLM 基础原理
+    ↓
+Transformer / Token / Embedding
+    ↓
+LLM API / Local LLM / Ollama
+    ↓
+Prompt Engineering
+    ↓
+Tool Calling
+    ↓
+Agent 基础范式
+    ↓
+ReAct / Plan-and-Solve / Reflection
+    ↓
+RAG
+    ↓
+LangChain / LCEL
+    ↓
+Conversational RAG
+    ↓
+LangGraph
+    ↓
+Agentic RAG
+    ↓
+MCP
+    ↓
+Multi-Agent / Agent Engineering
 ```
 
-本项目中的智能体会让 LLM 与外部工具进行多轮交互：
+仓库根目录中的早期 Python 文件主要用于理解 Agent 与 LLM 应用开发的基础机制，包括：
 
-```mermaid
-flowchart TD
-    A[用户请求] --> B[LLM 决策]
-    B --> C{解析 Action}
-    C -->|调用工具| D[本地 Python 工具]
-    D --> E[Observation]
-    E --> B
-    C -->|Finish| F[最终答案]
-```
+- LLM API 调用与流式输出
+- OpenAI Compatible API
+- 本地 / 开源模型调用
+- LLM Client 封装
+- Tool 定义与动态调用
+- Prompt 与上下文管理
+- ReAct：Thought → Action → Observation
+- Agent Loop
+- 基础 Memory
+- `.env` 与 API Key 管理
 
-因此，LLM 本身并不会直接执行 Python 函数。它只输出希望执行的 `Action`，真正的函数调用由本地 Python 程序完成。
+这些代码主要用于理解原理，后续项目将逐步使用 LangChain、LangGraph 等框架进行工程化实现。
 
-## 当前实现
+---
 
-| 文件 | 内容 |
-| --- | --- |
-| `01-简单智能体搭建.py` | 实现 System Prompt、天气工具、景点搜索工具、OpenAI 兼容客户端、Action 解析和 Agent 主循环 |
+# 🧠 LLM / Agent 面试知识复习
 
-### 可用工具
+## 1. Token 与 BPE
 
-#### `get_weather(city)`
+### Token 是什么？
 
-通过 `requests` 请求 `wttr.in`，获取指定城市的实时天气 JSON 数据，并提取：
+Token 是大语言模型处理文本的基本单位。
 
-- 天气描述；
-- 当前摄氏温度。
-
-#### `get_attraction(city, weather)`
-
-通过 Tavily Search API 根据城市和天气搜索景点推荐。请求开启 `include_answer=True` 时，优先返回 Tavily 整理后的综合答案；如果没有综合答案，则整理原始搜索结果。
-
-## Agent 运行流程
-
-程序使用一种简化的 ReAct 风格协议，让模型每轮输出一组 `Thought` 和 `Action`：
+文本不会直接进入 Transformer，而是：
 
 ```text
-Thought: 分析当前信息并决定下一步
-Action: get_weather(city="北京")
+Text
+ ↓
+Tokenizer
+ ↓
+Token
+ ↓
+Token ID
+ ↓
+Embedding
+ ↓
+Vector
 ```
 
-工具执行完成后，Python 将结果记录为：
+Token 不一定等于一个完整单词，也可能是：
+
+- 一个字符
+- 一个子词
+- 一个单词
+- 标点符号
+
+### BPE 是什么？
+
+BPE（Byte Pair Encoding）是一类常见的子词分词算法。
+
+基本思想：
+
+> 从基础符号开始，不断合并语料中高频出现的符号组合，最终形成词表。
+
+这样既可以控制词表大小，也能够处理未见过的新词。
+
+---
+
+## 2. Embedding
+
+Embedding 的作用：
+
+> 将离散的 Token / 文本转换成连续的高维向量表示。
+
+例如：
 
 ```text
-Observation: 北京当前天气：Cloudy，气温32摄氏度
+"Transformer uses attention"
+
+        ↓ Embedding
+
+[0.12, -0.34, 0.56, ...]
 ```
 
-下一轮调用时，Observation 会加入提示词，LLM 根据新信息继续决定行动：
+Embedding 模型通过训练，使语义相近的文本在向量空间中距离更近。
+
+因此可以实现：
 
 ```text
-Thought: 已获得天气，需要根据天气查询景点
-Action: get_attraction(city="北京", weather="Cloudy")
+Query
+ ↓
+Embedding
+ ↓
+Query Vector
+ ↓
+与 Document Vector 比较
+ ↓
+Semantic Search
 ```
 
-信息足够后，模型使用以下格式结束任务：
+这也是 Vector RAG 的基础。
+
+---
+
+## 3. Transformer
+
+Transformer 的核心结构：
 
 ```text
-Action: Finish[最终回答]
+Token
+ ↓
+Embedding
+ ↓
+Position Information
+ ↓
+Multi-Head Self-Attention
+ ↓
+Residual + LayerNorm
+ ↓
+Feed Forward Network
+ ↓
+Residual + LayerNorm
+ ↓
+下一层 Transformer
 ```
 
-主循环最多执行 5 次，用于避免模型不断调用工具而无法结束：
+### Self-Attention
 
-```python
-for i in range(5):
-    ...
-```
-
-## 核心代码机制
-
-### 1. System Prompt
-
-System Prompt 是调用 LLM 时预先提供的一组全局指令，用于规定模型的身份、任务目标、行为规则、可用工具和输出格式。
-
-本项目通过 `AGENT_SYSTEM_PROMPT` 将模型设置为智能旅行助手，并要求它严格输出：
+对于输入向量 `X`：
 
 ```text
-Thought: ...
-Action: ...
+Q = XWq
+K = XWk
+V = XWv
 ```
 
-### 2. OpenAI 兼容客户端
+注意力计算：
 
-`OpenAICompatibleClient` 对 OpenAI Python SDK 进行简单封装：
-
-```python
-llm = OpenAICompatibleClient(
-    model=MODEL_ID,
-    api_key=API_KEY,
-    base_url=BASE_URL,
-)
+```text
+Attention(Q,K,V)
+=
+softmax(QKᵀ / √dk)V
 ```
 
 其中：
 
-- `model`：服务商提供的模型名称；
-- `api_key`：访问模型服务的身份凭证；
-- `base_url`：模型服务的 API 地址。
+- Query：当前 Token 想寻找什么信息
+- Key：每个 Token 提供什么匹配信息
+- Value：真正被聚合的信息
 
-只要服务商提供 OpenAI 兼容接口，就可以继续使用相同的客户端结构，不局限于某一个模型服务商。
+---
 
-### 3. 工具注册表
+## 4. Multi-Head Attention
 
-所有允许模型调用的函数都放入 `available_tools`：
+单个 Attention Head 只能在一个表示空间中学习关系。
 
-```python
-available_tools = {
-    "get_weather": get_weather,
-    "get_attraction": get_attraction,
-}
+Multi-Head Attention：
+
+```text
+Head1
+Head2
+Head3
+...
+HeadN
+ ↓
+Concat
+ ↓
+Linear Projection
 ```
 
-它既是工具名称到 Python 函数的映射，也是一份工具白名单。只有出现在字典中的工具才会被执行。
+不同 Attention Head 可以学习不同类型的 Token 关系。
 
-### 4. Action 解析
+最终：
 
-程序使用正则表达式提取模型输出中的 Action：
-
-```python
-action_match = re.search(r"Action: (.*)", llm_output, re.DOTALL)
+```text
+MultiHead(Q,K,V)
+=
+Concat(head1,...,headh)Wo
 ```
 
-然后继续提取工具名称和参数：
+---
+
+## 5. Position Encoding 与 RoPE
+
+Transformer 本身没有 RNN 的顺序结构，因此需要显式加入位置信息。
+
+传统 Position Encoding：
+
+```text
+Token Embedding
++
+Position Embedding
+```
+
+RoPE（Rotary Position Embedding）则通过对 Query / Key 的向量维度进行旋转，引入位置信息。
+
+其特点：
+
+- 不改变向量模长
+- 改变向量方向
+- Attention 内积能够自然包含相对位置信息
+
+---
+
+## 6. Decoder-only 与 Causal Mask
+
+GPT 类模型通常采用 Decoder-only Transformer。
+
+生成时：
+
+```text
+Token1 Token2 Token3 Token4
+```
+
+Token4 可以看到：
+
+```text
+Token1 Token2 Token3
+```
+
+但 Token2 不能看到：
+
+```text
+Token3 Token4
+```
+
+通过 Causal Mask 实现：
+
+```text
+只能关注当前位置左侧的信息
+```
+
+从而满足自回归生成：
+
+```text
+P(x_t | x_1, x_2, ..., x_(t-1))
+```
+
+---
+
+## 7. KV Cache
+
+如果每生成一个 Token 都重新计算之前所有 Token 的 K、V：
+
+```text
+Token1
+Token1 Token2
+Token1 Token2 Token3
+...
+```
+
+会产生大量重复计算。
+
+KV Cache 会保存历史 Token 已计算好的：
+
+```text
+Key
+Value
+```
+
+生成新 Token 时只需要计算新 Token 的 Q/K/V。
+
+因此 KV Cache：
+
+> 用显存换推理速度。
+
+---
+
+## 8. Context Window
+
+Context Window 表示模型一次推理能够处理的最大 Token 数量。
+
+通常包括：
+
+```text
+System Prompt
++
+Chat History
++
+Retrieved Context
++
+Current Query
++
+Generated Tokens
+```
+
+当上下文过长时：
+
+- 计算成本增加
+- KV Cache 占用增加
+- 可能超过模型最大上下文长度
+
+这也是 RAG 不直接把整个知识库塞进 Prompt，而是先检索相关内容的重要原因。
+
+---
+
+## 9. Temperature
+
+Temperature 用于调节 Softmax 概率分布：
+
+```text
+P(x_i) =
+exp(z_i / T)
+/
+Σ exp(z_j / T)
+```
+
+T 较低：
+
+```text
+概率分布更集中
+→ 输出更稳定
+```
+
+T 较高：
+
+```text
+概率分布更平滑
+→ 输出更多样
+```
+
+---
+
+# 🤖 Agent 基础
+
+普通 LLM：
+
+```text
+User
+ ↓
+LLM
+ ↓
+Answer
+```
+
+Agent：
+
+```text
+User
+ ↓
+LLM
+ ↓
+Reasoning / Planning
+ ↓
+Tool
+ ↓
+Observation
+ ↓
+LLM
+ ↓
+...
+ ↓
+Answer
+```
+
+Agent 的核心不是“模型更大”，而是：
+
+> LLM 可以根据任务状态决定下一步行动，并利用外部工具与环境交互。
+
+---
+
+## ReAct
+
+ReAct：
+
+```text
+Reasoning + Acting
+```
+
+典型循环：
+
+```text
+Thought
+ ↓
+Action
+ ↓
+Observation
+ ↓
+Thought
+ ↓
+Action
+ ↓
+...
+ ↓
+Final Answer
+```
+
+---
+
+## Plan-and-Solve
+
+与 ReAct 边执行边思考不同：
+
+```text
+问题
+ ↓
+先制定完整计划
+ ↓
+按计划逐步执行
+```
+
+更适合结构明确的复杂任务。
+
+---
+
+## Reflection
+
+Reflection 强调：
+
+```text
+生成结果
+ ↓
+检查结果
+ ↓
+发现问题
+ ↓
+修改
+ ↓
+重新执行
+```
+
+适合：
+
+- Coding
+- Code Review
+- 写作
+- 推理检查
+- 自我纠错
+
+---
+
+# 🔌 Tool Calling 与 MCP
+
+## Tool Calling
+
+LLM 本身不会直接执行 Python 函数。
+
+它产生：
+
+```text
+Tool Name
++
+Arguments
+```
+
+本地程序负责真正执行函数，并把结果重新返回给模型。
+
+---
+
+## MCP
+
+MCP：
+
+```text
+Model Context Protocol
+```
+
+用于标准化：
+
+```text
+Agent
+ ↓
+外部工具 / 数据 / 系统
+```
+
+可以理解为：
+
+> Agent 连接外部能力的一套标准协议。
+
+例如：
+
+```text
+Agent
+ ↓
+MCP Client
+ ↓
+MCP Server
+ ├── File System
+ ├── GitHub
+ ├── Database
+ └── Search
+```
+
+---
+
+# 📚 RAG
+
+RAG：
+
+```text
+Retrieval-Augmented Generation
+```
+
+核心思想：
+
+> 先检索相关知识，再让 LLM 基于检索结果生成答案。
+
+基本流程：
+
+```text
+Documents
+ ↓
+Chunk
+ ↓
+Embedding
+ ↓
+Vector Store
+```
+
+查询：
+
+```text
+Query
+ ↓
+Embedding
+ ↓
+Vector Search
+ ↓
+Relevant Chunks
+ ↓
+Prompt
+ ↓
+LLM
+ ↓
+Answer
+```
+
+RAG 不一定需要访问互联网。
+
+知识源可以是：
+
+```text
+PDF
+Markdown
+Database
+Enterprise Documents
+Vector Database
+Web Search
+```
+
+---
+
+# 🚀 Projects
+
+## 01. Paper Agent 🚧 In Progress
+
+目录：
+
+```text
+paper-Agent/
+```
+
+目标：
+
+> 从零实现一个面向论文阅读的 Local RAG / Conversational RAG 系统，并逐步升级为 Research Agent。
+
+### 技术栈
+
+```text
+Python
+LangChain
+LCEL
+Ollama
+Chroma
+PyMuPDF
+nomic-embed-text
+```
+
+---
+
+# 📖 Paper Agent 学习记录
+
+## Stage 1：PDF Loading
+
+使用：
 
 ```python
-tool_name = re.search(r"(\w+)\(", action_str).group(1)
-args_str = re.search(r"\((.*)\)", action_str).group(1)
-kwargs = dict(re.findall(r'(\w+)="([^"]*)"', args_str))
+PyMuPDFLoader
+```
+
+将 PDF 转换成 LangChain：
+
+```python
+List[Document]
+```
+
+每个 Document 主要包含：
+
+```text
+page_content
+metadata
 ```
 
 例如：
 
 ```text
-get_weather(city="北京")
+Document
+├── page_content
+└── metadata
+    ├── page
+    └── source
 ```
 
-会被解析成：
+Metadata 用于保留页码、来源等信息，为后续 Citation 提供基础。
+
+---
+
+## Stage 2：Text Splitting
+
+使用：
 
 ```python
-tool_name = "get_weather"
-kwargs = {"city": "北京"}
+RecursiveCharacterTextSplitter
 ```
 
-### 5. 动态调用本地函数
-
-解析完成后，通过字典找到函数并传入参数：
-
-```python
-observation = available_tools[tool_name](**kwargs)
-```
-
-它等价于：
-
-```python
-observation = get_weather(city="北京")
-```
-
-其中 `**kwargs` 用于把字典拆成关键字参数。
-
-### 6. Prompt History
-
-程序使用列表保存用户请求和工具执行结果：
-
-```python
-prompt_history = [f"用户请求: {user_prompt}"]
-```
-
-每次调用 LLM 前，将历史信息拼接成完整提示词：
-
-```python
-full_prompt = "\n".join(prompt_history)
-```
-
-工具执行完成后追加 Observation：
-
-```python
-prompt_history.append(observation_str)
-```
-
-这构成了当前智能体最基础的短期记忆。
-
-## 环境准备
-
-建议使用 Python 3，并在虚拟环境中运行。
-
-安装依赖：
-
-```bash
-pip install requests tavily-python openai python-dotenv
-```
-
-依赖用途：
-
-| 依赖 | 用途 |
-| --- | --- |
-| `requests` | 发送 HTTP 请求，访问天气 API |
-| `tavily-python` | 调用 Tavily Search API |
-| `openai` | 调用 OpenAI 兼容的 LLM 服务 |
-| `python-dotenv` | 从 `.env` 文件加载 API 配置 |
-
-## 配置环境变量
-
-在 Python 文件同一目录创建 `.env`：
-
-```env
-LLM_API_KEY=你的LLM服务API密钥
-LLM_BASE_URL=你的LLM服务API地址
-LLM_MODEL=你的模型名称
-TAVILY_API_KEY=你的Tavily密钥
-```
-
-程序通过以下代码加载：
-
-```python
-env_path = ".env"
-load_dotenv(env_path)
-```
-
-然后从当前 Python 进程的环境变量中读取：
-
-```python
-API_KEY = os.environ.get("LLM_API_KEY")
-BASE_URL = os.environ.get("LLM_BASE_URL")
-MODEL_ID = os.environ.get("LLM_MODEL")
-TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
-```
-
-建议同时创建 `.gitignore`：
-
-```gitignore
-.env
-__pycache__/
-*.pyc
-```
-
-不要把真实 API Key 写进 Python 源码，也不要将 `.env` 上传到 GitHub。
-
-## 运行项目
-
-```bash
-python "01-简单智能体搭建.py"
-```
-
-当前脚本包含两个运行阶段：
-
-1. 直接调用天气和景点工具，测试工具是否可用；
-2. 启动 Agent 主循环，完成“查询北京天气并推荐景点”的任务。
-
-终端会依次显示：
-
-- 当前用户请求；
-- 每轮拼接后的提示词；
-- LLM 输出的 Thought 和 Action；
-- Python 实际调用的工具及参数；
-- 工具返回的 Observation；
-- 最终回答。
-
-## 当前学习到的知识点
-
-| 知识点 | 对应实现 |
-| --- | --- |
-| HTTP 请求与 JSON 解析 | `requests.get()`、`response.json()` |
-| 第三方 API 调用 | wttr.in、Tavily Search API |
-| API Key 管理 | `.env`、`load_dotenv()`、`os.environ.get()` |
-| LLM 消息结构 | `system` 和 `user` 两种消息角色 |
-| OpenAI 兼容接口 | `OpenAI(api_key, base_url)` |
-| System Prompt | 定义身份、任务、工具和输出协议 |
-| ReAct 基本结构 | `Thought → Action → Observation` |
-| 正则表达式 | `re.search()`、`re.match()`、`re.findall()` |
-| 工具白名单 | `available_tools` 字典 |
-| 动态函数调用 | `available_tools[tool_name](**kwargs)` |
-| 短期记忆 | `prompt_history` |
-| Agent 控制循环 | 最多执行 5 轮的 `for` 循环 |
-| 异常处理 | 网络、数据解析和 API 调用异常 |
-
-## 代码中各部分的职责
+将长文档切分成多个 Chunk：
 
 ```text
-AGENT_SYSTEM_PROMPT
-    规定智能体如何工作
-
-OpenAICompatibleClient
-    负责向 LLM 服务发送请求
-
-get_weather / get_attraction
-    负责访问外部环境并获取信息
-
-available_tools
-    注册并限制允许调用的工具
-
-正则表达式
-    将模型输出的 Action 转换成工具名和参数
-
-Agent 主循环
-    组织“决策 → 执行 → 观察 → 再决策”的完整过程
+PDF
+ ↓
+Document
+ ↓
+Chunk1
+Chunk2
+Chunk3
+...
 ```
 
-## 当前实现的注意事项
+主要参数：
 
-这是一个用于理解 Agent 原理的学习性实现。后续可以继续改进：
+```text
+chunk_size
+chunk_overlap
+```
 
-- 将 `.env` 的加载移动到所有 API 调用之前；
-- 为天气请求增加 `timeout` 和失败重试；
-- 检查 LLM 是否返回空字符串或 `None`；
-- 对工具参数和 `Finish[...]` 格式增加更完整的解析保护；
-- 使用结构化 Tool Calling 替代纯正则表达式解析；
-- 将配置、工具、LLM 客户端和 Agent 控制器拆分成独立模块；
-- 增加日志、单元测试以及交互式用户输入。
+Overlap 可以降低文本边界切断语义的问题。
 
-## 项目定位
+---
 
-这个项目的重点不是实现一个功能复杂的旅行应用，而是从代码层面理解智能体的本质：
+## Stage 3：Embedding
 
-> LLM 负责根据目标和已有信息作出决策，工具负责与外部环境交互，本地控制程序负责约束、执行并反馈结果。
+当前使用本地 Ollama：
 
-通过手动完成这条执行链路，可以为后续学习 Function Calling、MCP、Agent 框架、多智能体协作和长期记忆打下基础。
+```text
+nomic-embed-text
+```
+
+流程：
+
+```text
+Chunk
+ ↓
+Embedding Model
+ ↓
+High-dimensional Vector
+```
+
+每一个 Chunk 对应一个语义向量。
+
+Query 使用同一个 Embedding Model：
+
+```text
+Query
+ ↓
+Query Vector
+```
+
+才能在同一个语义空间中进行距离比较。
+
+---
+
+## Stage 4：Chroma Vector Store
+
+使用：
+
+```python
+Chroma
+```
+
+存储：
+
+```text
+ID
+Embedding
+Document
+Metadata
+```
+
+区分两个过程：
+
+### Offline Indexing
+
+```text
+PDF
+ ↓
+Chunk
+ ↓
+Embedding
+ ↓
+Chroma
+```
+
+只在建立 / 更新知识库时执行。
+
+### Online Retrieval
+
+```text
+Query
+ ↓
+Query Embedding
+ ↓
+Chroma Search
+ ↓
+Top-K Documents
+```
+
+避免每次查询都重新进行文档 Embedding。
+
+---
+
+## Stage 5：Retriever
+
+最初直接使用：
+
+```python
+vector_store.similarity_search()
+```
+
+后升级为：
+
+```python
+retriever = vector_store.as_retriever()
+```
+
+Retriever 是 LangChain 对“检索行为”的统一抽象。
+
+Retriever 实现了 Runnable 接口，因此可以：
+
+```python
+retriever.invoke(query)
+```
+
+并直接加入 LCEL 工作流。
+
+---
+
+## Stage 6：Runnable 与 LCEL
+
+LangChain 中：
+
+```text
+Runnable
+```
+
+是可执行组件的统一抽象。
+
+常见 Runnable：
+
+```text
+Retriever
+PromptTemplate
+ChatModel
+RunnableLambda
+RunnablePassthrough
+Chain
+```
+
+因此可以：
+
+```python
+chain = prompt | llm
+```
+
+`|` 表示：
+
+```text
+前一个 Runnable 输出
+        ↓
+后一个 Runnable 输入
+```
+
+### RunnableLambda
+
+将普通 Python 函数包装成 Runnable：
+
+```python
+RunnableLambda(format_docs)
+```
+
+从而加入 LCEL Pipeline。
+
+### RunnablePassthrough
+
+输入什么，就原样返回什么：
+
+```text
+input
+ ↓
+RunnablePassthrough
+ ↓
+input
+```
+
+常用于工作流分支中保留原始输入。
+
+---
+
+## Stage 7：RAG Chain
+
+当前实现的基本 LCEL：
+
+```text
+                      Query
+                        │
+              ┌─────────┴─────────┐
+              ↓                   ↓
+          Retriever         Passthrough
+              ↓                   ↓
+       List[Document]            Query
+              ↓
+        Format Documents
+              ↓
+           Context
+              │                   │
+              └─────────┬─────────┘
+                        ↓
+                 PromptTemplate
+                        ↓
+                       LLM
+                        ↓
+                StrOutputParser
+                        ↓
+                     Answer
+```
+
+---
+
+## Stage 8：Chat History
+
+加入：
+
+```python
+HumanMessage
+AIMessage
+MessagesPlaceholder
+```
+
+聊天记录：
+
+```python
+[
+    HumanMessage(...),
+    AIMessage(...),
+    HumanMessage(...),
+    AIMessage(...)
+]
+```
+
+Prompt：
+
+```python
+MessagesPlaceholder(
+    variable_name="chat_history"
+)
+```
+
+保留真实的：
+
+```text
+Human
+AI
+Human
+AI
+```
+
+消息角色关系。
+
+实现：
+
+```text
+Chat History
+     ↓
+Final LLM
+```
+
+从单轮 RAG 升级为多轮 Conversational RAG。
+
+---
+
+## Stage 9：History-aware Retrieval
+
+仅仅让最终 LLM 看到聊天历史还不够。
+
+例如：
+
+```text
+Human:
+What is multi-head attention?
+
+Human:
+Why is it useful?
+```
+
+如果 Retriever 直接搜索：
+
+```text
+Why is it useful?
+```
+
+语义信息不足。
+
+因此加入 Query Rewrite：
+
+```text
+Chat History
++
+Current Query
+ ↓
+LLM Rewrite
+ ↓
+Standalone Query
+```
+
+例如：
+
+```text
+Why is it useful?
+
+↓
+
+What are the benefits of using multi-head attention?
+```
+
+然后：
+
+```text
+Rewritten Query
+ ↓
+Retriever
+ ↓
+Relevant Documents
+```
+
+最终：
+
+```text
+Chat History
+        ↓
+   Query Rewrite
+        ↓
+Standalone Query
+        ↓
+    Retriever
+        ↓
+     Context
+        │
+        ├──────────────┐
+        │              │
+Original Query    Chat History
+        │              │
+        └──────┬───────┘
+               ↓
+             Prompt
+               ↓
+              LLM
+               ↓
+             Answer
+```
+
+当前项目已经完成这一阶段。
+
+---
+
+# 🔨 Paper Agent 下一步
+
+计划继续加入：
+
+```text
+Source Citation
+        ↓
+Similarity Score / Threshold
+        ↓
+MMR Retrieval
+        ↓
+Reranker
+        ↓
+Multiple PDFs
+        ↓
+Document Management
+        ↓
+LangGraph
+        ↓
+Agentic RAG
+        ↓
+Web / arXiv Search Tool
+        ↓
+Research Agent
+```
+
+最终目标：
+
+```text
+User Research Question
+        ↓
+Query Analysis
+        ↓
+Local Paper RAG
+        ↓
+External Paper Search
+        ↓
+Evidence Retrieval
+        ↓
+Answer / Summary
+        ↓
+Citation
+        ↓
+Research Report
+```
+
+---
+
+# 🗺️ Project Roadmap
+
+| Project | Core Technologies | Status |
+|---|---|---|
+| **Paper Agent** | LangChain, RAG, Chroma, Ollama, Conversational RAG | 🚧 In Progress |
+| **Research Agent** | LangGraph, Tool Calling, Planning, Web / arXiv Search | 📋 Planned |
+| **MCP Agent** | MCP Client / Server, Files, GitHub, Database Tools | 📋 Planned |
+| **Multi-Agent Workflow** | LangGraph, Multi-Agent, Reflection, Human-in-the-loop | 📋 Planned |
+
+---
+
+# 🧩 Current Tech Stack
+
+```text
+Language
+└── Python
+
+LLM
+├── Ollama
+├── OpenAI Compatible API
+└── Local Open-source Models
+
+LLM Framework
+├── LangChain
+└── LCEL
+
+RAG
+├── PyMuPDF
+├── RecursiveCharacterTextSplitter
+├── nomic-embed-text
+├── Chroma
+└── Retriever
+
+Agent
+├── ReAct
+├── Tool Calling
+├── Memory
+└── Query Rewrite
+
+Next
+├── LangGraph
+├── MCP
+├── Agentic RAG
+└── Multi-Agent
+```
+
+---
+
+# 🎯 Repository Goal
+
+这个仓库并不是简单收集各种 AI Demo。
+
+主要目标是：
+
+> 从底层机制开始理解 LLM 与 Agent，再逐步使用框架进行工程化实现，并通过完整项目形成可以解释、可以扩展、可以复现的 AI Agent 开发能力。
+
+学习方式：
+
+```text
+理解原理
+ ↓
+手动实现
+ ↓
+框架重构
+ ↓
+发现问题
+ ↓
+逐步优化
+ ↓
+完整项目
+```
+
+后续会持续更新 Paper Agent，并逐步推进 LangGraph、Agentic RAG、MCP 与 Multi-Agent 项目。
