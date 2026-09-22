@@ -1,73 +1,101 @@
 # Agent Practice
 
-面向 **LLM / RAG / AI Agent 应用开发** 的个人学习与项目实践仓库。
+这是我的 **LLM / RAG / AI Agent 学习与项目实践仓库**。
 
-本仓库用于记录我从大语言模型基础原理，到 RAG、Agent、LangChain、LangGraph、MCP 等 AI 应用开发技术的学习过程，并通过完整项目逐步将理论知识转化为工程实践能力。
+仓库主要分为两部分：
 
-当前重点：
+1. **基础知识**：记录已经学习过的核心概念，用于日常复习和面试准备。
+2. **项目实践**：记录每个项目从设计、实现到优化的完整过程。
 
-> 🚧 **Paper Agent：基于 LangChain + Ollama + Chroma 构建论文 RAG / Conversational RAG 系统**
-
----
-
-# 📌 Learning Roadmap
-
-```text
-LLM 基础原理
-    ↓
-Transformer / Token / Embedding
-    ↓
-LLM API / Local LLM / Ollama
-    ↓
-Prompt Engineering
-    ↓
-Tool Calling
-    ↓
-Agent 基础范式
-    ↓
-ReAct / Plan-and-Solve / Reflection
-    ↓
-RAG
-    ↓
-LangChain / LCEL
-    ↓
-Conversational RAG
-    ↓
-LangGraph
-    ↓
-Agentic RAG
-    ↓
-MCP
-    ↓
-Multi-Agent / Agent Engineering
-```
-
-仓库根目录中的早期 Python 文件主要用于理解 Agent 与 LLM 应用开发的基础机制，包括：
-
-- LLM API 调用与流式输出
-- OpenAI Compatible API
-- 本地 / 开源模型调用
-- LLM Client 封装
-- Tool 定义与动态调用
-- Prompt 与上下文管理
-- ReAct：Thought → Action → Observation
-- Agent Loop
-- 基础 Memory
-- `.env` 与 API Key 管理
-
-这些代码主要用于理解原理，后续项目将逐步使用 LangChain、LangGraph 等框架进行工程化实现。
+后续每学习一个新的概念，例如 **RAG、MCP、LangGraph、Reranker、Multi-Agent**，都会继续补充到“基础知识”中；每完成一个新的项目或功能，则继续补充到对应项目章节。
 
 ---
 
-# 🧠 LLM / Agent 面试知识复习
+# 目录
 
-## 1. Token 与 BPE
+## 1. 基础知识
 
-### Token 是什么？
+### 1.1 LLM 基础
+- [Token](#111-token)
+- [BPE](#112-bpe)
+- [Embedding](#113-embedding)
+- [Transformer](#114-transformer)
+- [Self-Attention](#115-self-attention)
+- [Multi-Head Attention](#116-multi-head-attention)
+- [Position Encoding 与 RoPE](#117-position-encoding-与-rope)
+- [Decoder-only 与 Causal Mask](#118-decoder-only-与-causal-mask)
+- [KV Cache](#119-kv-cache)
+- [Context Window](#1110-context-window)
+- [Temperature](#1111-temperature)
+
+### 1.2 LLM 应用基础
+- [Prompt Engineering](#121-prompt-engineering)
+- [LLM API 与 OpenAI Compatible API](#122-llm-api-与-openai-compatible-api)
+- [Ollama 与本地模型](#123-ollama-与本地模型)
+
+### 1.3 Agent 基础
+- [什么是 Agent](#131-什么是-agent)
+- [Tool Calling / Function Calling](#132-tool-calling--function-calling)
+- [ReAct](#133-react)
+- [Plan-and-Solve](#134-plan-and-solve)
+- [Reflection](#135-reflection)
+- [Memory](#136-memory)
+
+### 1.4 RAG 基础
+- [什么是 RAG](#141-什么是-rag)
+- [Document 与 Chunk](#142-document-与-chunk)
+- [Embedding 与语义检索](#143-embedding-与语义检索)
+- [Vector Database](#144-vector-database)
+- [Retriever](#145-retriever)
+- [Conversational RAG](#146-conversational-rag)
+- [History-aware Retrieval](#147-history-aware-retrieval)
+
+### 1.5 LangChain / Agent 工程
+- [LangChain](#151-langchain)
+- [LCEL](#152-lcel)
+- [Runnable](#153-runnable)
+- [RunnableLambda](#154-runnablelambda)
+- [RunnablePassthrough](#155-runnablepassthrough)
+
+### 1.6 MCP
+- [MCP 是什么](#161-mcp-是什么)
+- [MCP Client / Server](#162-mcp-client--server)
+- [MCP 与 Tool Calling 的区别](#163-mcp-与-tool-calling-的区别)
+
+---
+
+## 2. Paper Agent
+
+- [2.1 项目目标](#21-项目目标)
+- [2.2 技术栈](#22-技术栈)
+- [2.3 当前系统架构](#23-当前系统架构)
+- [2.4 Stage 1：PDF Loading](#24-stage-1pdf-loading)
+- [2.5 Stage 2：Text Splitting](#25-stage-2text-splitting)
+- [2.6 Stage 3：Embedding](#26-stage-3embedding)
+- [2.7 Stage 4：Chroma Vector Store](#27-stage-4chroma-vector-store)
+- [2.8 Stage 5：Retriever](#28-stage-5retriever)
+- [2.9 Stage 6：LCEL RAG Chain](#29-stage-6lcel-rag-chain)
+- [2.10 Stage 7：Chat History](#210-stage-7chat-history)
+- [2.11 Stage 8：History-aware Retrieval](#211-stage-8history-aware-retrieval)
+- [2.12 下一步计划](#212-下一步计划)
+
+---
+
+## 3. 后续项目
+
+- [3.1 Research Agent](#31-research-agent)
+- [3.2 MCP Agent](#32-mcp-agent)
+- [3.3 Multi-Agent Workflow](#33-multi-agent-workflow)
+
+---
+
+# 1. 基础知识
+
+## 1.1 LLM 基础
+
+### 1.1.1 Token
 
 Token 是大语言模型处理文本的基本单位。
-
-文本不会直接进入 Transformer，而是：
 
 ```text
 Text
@@ -83,64 +111,41 @@ Embedding
 Vector
 ```
 
-Token 不一定等于一个完整单词，也可能是：
+Token 不一定是完整单词，也可能是字符、子词或标点。
 
-- 一个字符
-- 一个子词
-- 一个单词
-- 标点符号
+---
 
-### BPE 是什么？
+### 1.1.2 BPE
 
 BPE（Byte Pair Encoding）是一类常见的子词分词算法。
 
-基本思想：
+核心思想：
 
-> 从基础符号开始，不断合并语料中高频出现的符号组合，最终形成词表。
+> 从基础符号开始，不断合并语料中高频出现的符号组合，逐步形成词表。
 
-这样既可以控制词表大小，也能够处理未见过的新词。
-
----
-
-## 2. Embedding
-
-Embedding 的作用：
-
-> 将离散的 Token / 文本转换成连续的高维向量表示。
-
-例如：
-
-```text
-"Transformer uses attention"
-
-        ↓ Embedding
-
-[0.12, -0.34, 0.56, ...]
-```
-
-Embedding 模型通过训练，使语义相近的文本在向量空间中距离更近。
-
-因此可以实现：
-
-```text
-Query
- ↓
-Embedding
- ↓
-Query Vector
- ↓
-与 Document Vector 比较
- ↓
-Semantic Search
-```
-
-这也是 Vector RAG 的基础。
+这样既可以控制词表规模，也能够处理未见过的新词。
 
 ---
 
-## 3. Transformer
+### 1.1.3 Embedding
 
-Transformer 的核心结构：
+Embedding 将离散的 Token 或文本映射为连续的高维向量。
+
+```text
+Text
+ ↓
+Embedding Model
+ ↓
+Vector
+```
+
+语义相近的文本会被训练到向量空间中较近的位置，因此可以用于语义检索。
+
+---
+
+### 1.1.4 Transformer
+
+Transformer 的核心结构可以概括为：
 
 ```text
 Token
@@ -156,13 +161,15 @@ Residual + LayerNorm
 Feed Forward Network
  ↓
 Residual + LayerNorm
- ↓
-下一层 Transformer
 ```
 
-### Self-Attention
+与 RNN 不同，Transformer 不依赖递归结构，而是通过 Attention 建模 Token 之间的关系。
 
-对于输入向量 `X`：
+---
+
+### 1.1.5 Self-Attention
+
+对于输入矩阵 `X`：
 
 ```text
 Q = XWq
@@ -170,7 +177,7 @@ K = XWk
 V = XWv
 ```
 
-注意力计算：
+Attention：
 
 ```text
 Attention(Q,K,V)
@@ -178,24 +185,21 @@ Attention(Q,K,V)
 softmax(QKᵀ / √dk)V
 ```
 
-其中：
+直观理解：
 
 - Query：当前 Token 想寻找什么信息
-- Key：每个 Token 提供什么匹配信息
+- Key：每个 Token 能提供什么匹配信息
 - Value：真正被聚合的信息
 
 ---
 
-## 4. Multi-Head Attention
+### 1.1.6 Multi-Head Attention
 
-单个 Attention Head 只能在一个表示空间中学习关系。
-
-Multi-Head Attention：
+Multi-Head Attention 使用多个 Attention Head 并行学习不同表示空间中的关系。
 
 ```text
 Head1
 Head2
-Head3
 ...
 HeadN
  ↓
@@ -204,9 +208,7 @@ Concat
 Linear Projection
 ```
 
-不同 Attention Head 可以学习不同类型的 Token 关系。
-
-最终：
+公式：
 
 ```text
 MultiHead(Q,K,V)
@@ -214,59 +216,44 @@ MultiHead(Q,K,V)
 Concat(head1,...,headh)Wo
 ```
 
+多个 Head 可以关注不同位置、不同语义关系和不同特征子空间。
+
 ---
 
-## 5. Position Encoding 与 RoPE
+### 1.1.7 Position Encoding 与 RoPE
 
-Transformer 本身没有 RNN 的顺序结构，因此需要显式加入位置信息。
+Transformer 本身没有顺序结构，因此需要加入位置信息。
 
-传统 Position Encoding：
+传统方法：
 
 ```text
 Token Embedding
 +
-Position Embedding
+Position Encoding
 ```
 
-RoPE（Rotary Position Embedding）则通过对 Query / Key 的向量维度进行旋转，引入位置信息。
+RoPE（Rotary Position Embedding）通过旋转 Query / Key 的向量表示引入位置信息。
 
-其特点：
+特点：
 
 - 不改变向量模长
 - 改变向量方向
-- Attention 内积能够自然包含相对位置信息
+- Attention 内积可以自然包含相对位置信息
 
 ---
 
-## 6. Decoder-only 与 Causal Mask
+### 1.1.8 Decoder-only 与 Causal Mask
 
 GPT 类模型通常采用 Decoder-only Transformer。
 
-生成时：
+Causal Mask 保证：
 
 ```text
-Token1 Token2 Token3 Token4
+当前位置只能看到当前及之前的 Token
+不能看到未来 Token
 ```
 
-Token4 可以看到：
-
-```text
-Token1 Token2 Token3
-```
-
-但 Token2 不能看到：
-
-```text
-Token3 Token4
-```
-
-通过 Causal Mask 实现：
-
-```text
-只能关注当前位置左侧的信息
-```
-
-从而满足自回归生成：
+因此能够实现自回归生成：
 
 ```text
 P(x_t | x_1, x_2, ..., x_(t-1))
@@ -274,37 +261,28 @@ P(x_t | x_1, x_2, ..., x_(t-1))
 
 ---
 
-## 7. KV Cache
+### 1.1.9 KV Cache
 
-如果每生成一个 Token 都重新计算之前所有 Token 的 K、V：
+生成新 Token 时，历史 Token 的 Key 和 Value 不需要重复计算。
 
-```text
-Token1
-Token1 Token2
-Token1 Token2 Token3
-...
-```
-
-会产生大量重复计算。
-
-KV Cache 会保存历史 Token 已计算好的：
+KV Cache 保存历史：
 
 ```text
 Key
 Value
 ```
 
-生成新 Token 时只需要计算新 Token 的 Q/K/V。
+新 Token 生成时只计算新增部分。
 
-因此 KV Cache：
+本质上：
 
-> 用显存换推理速度。
+> 使用显存换取推理速度。
 
 ---
 
-## 8. Context Window
+### 1.1.10 Context Window
 
-Context Window 表示模型一次推理能够处理的最大 Token 数量。
+Context Window 是模型一次能够处理的最大 Token 范围。
 
 通常包括：
 
@@ -320,44 +298,85 @@ Current Query
 Generated Tokens
 ```
 
-当上下文过长时：
-
-- 计算成本增加
-- KV Cache 占用增加
-- 可能超过模型最大上下文长度
-
-这也是 RAG 不直接把整个知识库塞进 Prompt，而是先检索相关内容的重要原因。
+上下文越长，推理成本和 KV Cache 占用通常越高。
 
 ---
 
-## 9. Temperature
+### 1.1.11 Temperature
 
-Temperature 用于调节 Softmax 概率分布：
+Temperature 用于调整模型采样时的概率分布。
 
 ```text
-P(x_i) =
+P(x_i)
+=
 exp(z_i / T)
 /
 Σ exp(z_j / T)
 ```
 
-T 较低：
-
-```text
-概率分布更集中
-→ 输出更稳定
-```
-
-T 较高：
-
-```text
-概率分布更平滑
-→ 输出更多样
-```
+- `T` 较低：概率分布更集中，输出更稳定
+- `T` 较高：概率分布更平滑，输出更多样
 
 ---
 
-# 🤖 Agent 基础
+## 1.2 LLM 应用基础
+
+### 1.2.1 Prompt Engineering
+
+Prompt Engineering 是通过设计输入指令，引导 LLM 按预期方式完成任务。
+
+常见内容包括：
+
+- System Prompt
+- 任务说明
+- 输出格式约束
+- Few-shot 示例
+- Context 注入
+- 角色与边界约束
+
+Prompt Engineering 是 LLM 应用开发中的一个环节，但并不等于完整的 LLM 应用工程。
+
+---
+
+### 1.2.2 LLM API 与 OpenAI Compatible API
+
+LLM 应用通常通过 API 与模型服务通信：
+
+```text
+Application
+ ↓
+SDK / HTTP
+ ↓
+LLM API
+ ↓
+Model
+```
+
+OpenAI Compatible API 允许不同模型服务使用相似的接口格式，从而降低应用层的切换成本。
+
+---
+
+### 1.2.3 Ollama 与本地模型
+
+Ollama 用于在本地运行和管理开源模型。
+
+```text
+Python Application
+ ↓
+Ollama Client
+ ↓
+Ollama Local Service
+ ↓
+Local Model
+```
+
+Python 虚拟环境中安装的是客户端依赖，而 Ollama 本身作为独立服务运行。
+
+---
+
+## 1.3 Agent 基础
+
+### 1.3.1 什么是 Agent
 
 普通 LLM：
 
@@ -389,21 +408,41 @@ LLM
 Answer
 ```
 
-Agent 的核心不是“模型更大”，而是：
+Agent 的核心能力是：
 
-> LLM 可以根据任务状态决定下一步行动，并利用外部工具与环境交互。
+> 根据当前任务状态决定下一步行动，并利用外部工具与环境完成任务。
 
 ---
 
-## ReAct
+### 1.3.2 Tool Calling / Function Calling
 
-ReAct：
+LLM 通常不会直接执行 Python 函数，而是生成：
 
 ```text
-Reasoning + Acting
+Tool Name
++
+Arguments
 ```
 
-典型循环：
+应用程序负责：
+
+```text
+LLM 决定调用工具
+ ↓
+程序执行工具
+ ↓
+获得结果
+ ↓
+把结果返回 LLM
+```
+
+---
+
+### 1.3.3 ReAct
+
+ReAct = Reasoning + Acting。
+
+典型流程：
 
 ```text
 Thought
@@ -421,89 +460,333 @@ Action
 Final Answer
 ```
 
+特点是推理和行动交替进行。
+
 ---
 
-## Plan-and-Solve
+### 1.3.4 Plan-and-Solve
 
-与 ReAct 边执行边思考不同：
+Plan-and-Solve 更强调先规划，再执行。
 
 ```text
-问题
+Problem
  ↓
-先制定完整计划
+Plan
  ↓
-按计划逐步执行
+Step 1
+ ↓
+Step 2
+ ↓
+...
+ ↓
+Answer
 ```
 
-更适合结构明确的复杂任务。
+适用于结构较明确、需要多步骤执行的任务。
 
 ---
 
-## Reflection
+### 1.3.5 Reflection
 
-Reflection 强调：
+Reflection 强调对已有结果进行检查和修正。
 
 ```text
-生成结果
+Generate
  ↓
-检查结果
+Evaluate
  ↓
-发现问题
+Find Problems
  ↓
-修改
+Revise
  ↓
-重新执行
+Generate Again
 ```
 
-适合：
-
-- Coding
-- Code Review
-- 写作
-- 推理检查
-- 自我纠错
+常用于代码生成、代码审查、写作和复杂推理。
 
 ---
 
-# 🔌 Tool Calling 与 MCP
+### 1.3.6 Memory
 
-## Tool Calling
+Agent / Chat 应用中的 Memory 用于保存过去交互产生的信息。
 
-LLM 本身不会直接执行 Python 函数。
-
-它产生：
+短期会话历史通常可以表示为：
 
 ```text
-Tool Name
+HumanMessage
+AIMessage
+HumanMessage
+AIMessage
+...
+```
+
+后续还可以扩展为摘要 Memory、向量 Memory、长期 Memory 等。
+
+---
+
+## 1.4 RAG 基础
+
+### 1.4.1 什么是 RAG
+
+RAG：
+
+> Retrieval-Augmented Generation
+
+核心思想：
+
+```text
+先检索相关知识
+ ↓
+把知识加入 Prompt
+ ↓
+LLM 基于这些知识回答
+```
+
+RAG 不要求知识一定来自互联网，本地 PDF、数据库、企业文档都可以作为知识源。
+
+---
+
+### 1.4.2 Document 与 Chunk
+
+长文档通常不会整体直接用于检索，而是先切分成 Chunk。
+
+```text
+PDF
+ ↓
+Document
+ ↓
+Chunk1
+Chunk2
+Chunk3
+...
+```
+
+Chunk 可以提升检索粒度，并降低上下文长度。
+
+---
+
+### 1.4.3 Embedding 与语义检索
+
+```text
+Document Chunk
+ ↓
+Embedding
+ ↓
+Document Vector
+```
+
+查询时：
+
+```text
+Query
+ ↓
+Embedding
+ ↓
+Query Vector
+ ↓
+Similarity Search
+```
+
+Query 和 Document 应使用兼容的 Embedding 模型映射到同一向量空间。
+
+---
+
+### 1.4.4 Vector Database
+
+向量数据库用于存储：
+
+```text
+ID
+Vector
+Document
+Metadata
+```
+
+当前项目使用：
+
+```text
+Chroma
+```
+
+---
+
+### 1.4.5 Retriever
+
+Retriever 是对“检索行为”的统一抽象。
+
+输入：
+
+```text
+Query
+```
+
+输出：
+
+```text
+List[Document]
+```
+
+它不一定只能使用向量检索，也可以基于 BM25、SQL、Web Search 等方式实现。
+
+---
+
+### 1.4.6 Conversational RAG
+
+普通 RAG：
+
+```text
+Current Question
+ ↓
+Retriever
+ ↓
+LLM
+```
+
+Conversational RAG 还需要利用历史对话：
+
+```text
+Chat History
 +
-Arguments
+Current Question
++
+Retrieved Context
+ ↓
+LLM
 ```
-
-本地程序负责真正执行函数，并把结果重新返回给模型。
 
 ---
 
-## MCP
+### 1.4.7 History-aware Retrieval
+
+仅让最终 LLM 看到历史还不够。
+
+例如：
+
+```text
+Q1: What is multi-head attention?
+Q2: Why is it useful?
+```
+
+如果 Retriever 只搜索：
+
+```text
+Why is it useful?
+```
+
+信息不足。
+
+因此加入 Query Rewrite：
+
+```text
+Chat History
++
+Current Question
+ ↓
+LLM Rewrite
+ ↓
+Standalone Question
+ ↓
+Retriever
+```
+
+例如：
+
+```text
+Why is it useful?
+ ↓
+What are the benefits of using multi-head attention?
+```
+
+---
+
+## 1.5 LangChain / Agent 工程
+
+### 1.5.1 LangChain
+
+LangChain 是用于构建 LLM 应用的开发框架，提供：
+
+- Prompt
+- Model
+- Retriever
+- Document
+- Output Parser
+- Runnable
+- Tool
+- Agent 等抽象
+
+---
+
+### 1.5.2 LCEL
+
+LCEL：
+
+> LangChain Expression Language
+
+通过 `|` 将多个组件组合成工作流：
+
+```python
+chain = prompt | llm | parser
+```
+
+含义：
+
+```text
+上一个组件的输出
+ ↓
+下一个组件的输入
+```
+
+---
+
+### 1.5.3 Runnable
+
+Runnable 是 LangChain 对“可执行组件”的统一抽象。
+
+Runnable 可以：
+
+```python
+component.invoke(input)
+```
+
+Prompt、LLM、Retriever 等组件都可以作为 Runnable 接入工作流。
+
+---
+
+### 1.5.4 RunnableLambda
+
+RunnableLambda 将普通 Python 函数包装成 Runnable：
+
+```python
+RunnableLambda(function)
+```
+
+从而使普通函数能够加入 LCEL 工作流。
+
+---
+
+### 1.5.5 RunnablePassthrough
+
+RunnablePassthrough：
+
+```text
+输入什么
+ ↓
+原样输出什么
+```
+
+通常用于工作流分支中保留原始输入。
+
+---
+
+## 1.6 MCP
+
+### 1.6.1 MCP 是什么
 
 MCP：
 
-```text
-Model Context Protocol
-```
+> Model Context Protocol
 
-用于标准化：
-
-```text
-Agent
- ↓
-外部工具 / 数据 / 系统
-```
-
-可以理解为：
-
-> Agent 连接外部能力的一套标准协议。
-
-例如：
+用于标准化 AI 应用与外部工具、数据源和系统之间的连接方式。
 
 ```text
 Agent
@@ -511,74 +794,45 @@ Agent
 MCP Client
  ↓
 MCP Server
- ├── File System
- ├── GitHub
- ├── Database
- └── Search
+ ↓
+External Capability
 ```
 
 ---
 
-# 📚 RAG
+### 1.6.2 MCP Client / Server
 
-RAG：
+MCP Client 通常存在于 AI 应用一侧。
 
-```text
-Retrieval-Augmented Generation
-```
-
-核心思想：
-
-> 先检索相关知识，再让 LLM 基于检索结果生成答案。
-
-基本流程：
+MCP Server 对外暴露可用能力，例如：
 
 ```text
-Documents
- ↓
-Chunk
- ↓
-Embedding
- ↓
-Vector Store
-```
-
-查询：
-
-```text
-Query
- ↓
-Embedding
- ↓
-Vector Search
- ↓
-Relevant Chunks
- ↓
-Prompt
- ↓
-LLM
- ↓
-Answer
-```
-
-RAG 不一定需要访问互联网。
-
-知识源可以是：
-
-```text
-PDF
-Markdown
+File System
 Database
-Enterprise Documents
-Vector Database
-Web Search
+GitHub
+Search
+Other Services
 ```
 
 ---
 
-# 🚀 Projects
+### 1.6.3 MCP 与 Tool Calling 的区别
 
-## 01. Paper Agent 🚧 In Progress
+Tool Calling 主要解决：
+
+> 模型如何决定调用哪个工具，以及传递什么参数。
+
+MCP 主要解决：
+
+> 工具和外部资源如何以标准协议提供给 AI 应用。
+
+两者可以配合使用。
+
+---
+
+# 2. Paper Agent
+
+## 2.1 项目目标
 
 目录：
 
@@ -586,11 +840,13 @@ Web Search
 paper-Agent/
 ```
 
-目标：
+当前目标：
 
-> 从零实现一个面向论文阅读的 Local RAG / Conversational RAG 系统，并逐步升级为 Research Agent。
+> 从零构建一个面向论文阅读的 Local RAG / Conversational RAG 系统，并在后续逐步升级为 Research Agent。
 
-### 技术栈
+---
+
+## 2.2 技术栈
 
 ```text
 Python
@@ -604,9 +860,49 @@ nomic-embed-text
 
 ---
 
-# 📖 Paper Agent 学习记录
+## 2.3 当前系统架构
 
-## Stage 1：PDF Loading
+```text
+PDF
+ ↓
+PyMuPDFLoader
+ ↓
+Documents
+ ↓
+Text Splitter
+ ↓
+Chunks
+ ↓
+Embedding
+ ↓
+Chroma Vector Store
+```
+
+查询流程：
+
+```text
+User Question
+ ↓
+Chat History + Query Rewrite
+ ↓
+Standalone Retrieval Query
+ ↓
+Retriever
+ ↓
+Relevant Chunks
+ ↓
+Context
+ ↓
+Prompt + Original Question + Chat History
+ ↓
+LLM
+ ↓
+Answer
+```
+
+---
+
+## 2.4 Stage 1：PDF Loading
 
 使用：
 
@@ -614,34 +910,24 @@ nomic-embed-text
 PyMuPDFLoader
 ```
 
-将 PDF 转换成 LangChain：
+读取 PDF 后得到：
 
 ```python
 List[Document]
 ```
 
-每个 Document 主要包含：
+每个 `Document` 主要包含：
 
 ```text
 page_content
 metadata
 ```
 
-例如：
-
-```text
-Document
-├── page_content
-└── metadata
-    ├── page
-    └── source
-```
-
-Metadata 用于保留页码、来源等信息，为后续 Citation 提供基础。
+Metadata 保存页码和来源等信息，为后续 Source Citation 提供基础。
 
 ---
 
-## Stage 2：Text Splitting
+## 2.5 Stage 2：Text Splitting
 
 使用：
 
@@ -649,80 +935,46 @@ Metadata 用于保留页码、来源等信息，为后续 Citation 提供基础�
 RecursiveCharacterTextSplitter
 ```
 
-将长文档切分成多个 Chunk：
-
-```text
-PDF
- ↓
-Document
- ↓
-Chunk1
-Chunk2
-Chunk3
-...
-```
-
-主要参数：
+当前核心参数：
 
 ```text
 chunk_size
 chunk_overlap
 ```
 
-Overlap 可以降低文本边界切断语义的问题。
+`chunk_overlap` 用于降低文本刚好在 Chunk 边界被切断时造成的语义损失。
 
 ---
 
-## Stage 3：Embedding
+## 2.6 Stage 3：Embedding
 
-当前使用本地 Ollama：
+使用 Ollama：
 
 ```text
 nomic-embed-text
 ```
-
-流程：
 
 ```text
 Chunk
  ↓
 Embedding Model
  ↓
-High-dimensional Vector
+Vector
 ```
 
-每一个 Chunk 对应一个语义向量。
-
-Query 使用同一个 Embedding Model：
-
-```text
-Query
- ↓
-Query Vector
-```
-
-才能在同一个语义空间中进行距离比较。
+Query 也使用同一 Embedding Model 转换为向量，然后与文档向量进行语义相似度比较。
 
 ---
 
-## Stage 4：Chroma Vector Store
+## 2.7 Stage 4：Chroma Vector Store
 
-使用：
+当前向量数据库：
 
-```python
+```text
 Chroma
 ```
 
-存储：
-
-```text
-ID
-Embedding
-Document
-Metadata
-```
-
-区分两个过程：
+将流程分为两部分：
 
 ### Offline Indexing
 
@@ -736,7 +988,7 @@ Embedding
 Chroma
 ```
 
-只在建立 / 更新知识库时执行。
+只在建立或更新知识库时进行。
 
 ### Online Retrieval
 
@@ -750,128 +1002,63 @@ Chroma Search
 Top-K Documents
 ```
 
-避免每次查询都重新进行文档 Embedding。
+查询时无需重新计算所有文档向量。
 
 ---
 
-## Stage 5：Retriever
+## 2.8 Stage 5：Retriever
 
-最初直接使用：
-
-```python
-vector_store.similarity_search()
-```
-
-后升级为：
+将：
 
 ```python
-retriever = vector_store.as_retriever()
+vector_store.similarity_search(...)
 ```
 
-Retriever 是 LangChain 对“检索行为”的统一抽象。
-
-Retriever 实现了 Runnable 接口，因此可以：
+进一步封装为：
 
 ```python
-retriever.invoke(query)
+retriever = vector_store.as_retriever(...)
 ```
 
-并直接加入 LCEL 工作流。
+Retriever 接收 Query，并返回：
+
+```python
+List[Document]
+```
+
+同时可以作为 Runnable 直接加入 LCEL 工作流。
 
 ---
 
-## Stage 6：Runnable 与 LCEL
+## 2.9 Stage 6：LCEL RAG Chain
 
-LangChain 中：
-
-```text
-Runnable
-```
-
-是可执行组件的统一抽象。
-
-常见 Runnable：
+通过 LCEL 将 RAG 各组件串联：
 
 ```text
-Retriever
-PromptTemplate
-ChatModel
-RunnableLambda
-RunnablePassthrough
-Chain
-```
-
-因此可以：
-
-```python
-chain = prompt | llm
-```
-
-`|` 表示：
-
-```text
-前一个 Runnable 输出
-        ↓
-后一个 Runnable 输入
-```
-
-### RunnableLambda
-
-将普通 Python 函数包装成 Runnable：
-
-```python
-RunnableLambda(format_docs)
-```
-
-从而加入 LCEL Pipeline。
-
-### RunnablePassthrough
-
-输入什么，就原样返回什么：
-
-```text
-input
+Query
+ ├───────────────┐
+ ↓               ↓
+Retriever      Question
  ↓
-RunnablePassthrough
+Documents
  ↓
-input
-```
-
-常用于工作流分支中保留原始输入。
-
----
-
-## Stage 7：RAG Chain
-
-当前实现的基本 LCEL：
-
-```text
-                      Query
-                        │
-              ┌─────────┴─────────┐
-              ↓                   ↓
-          Retriever         Passthrough
-              ↓                   ↓
-       List[Document]            Query
-              ↓
-        Format Documents
-              ↓
-           Context
-              │                   │
-              └─────────┬─────────┘
-                        ↓
-                 PromptTemplate
-                        ↓
-                       LLM
-                        ↓
-                StrOutputParser
-                        ↓
-                     Answer
+Format Docs
+ ↓
+Context
+ └───────┬───────┘
+         ↓
+       Prompt
+         ↓
+        LLM
+         ↓
+StrOutputParser
+         ↓
+       Answer
 ```
 
 ---
 
-## Stage 8：Chat History
+## 2.10 Stage 7：Chat History
 
 加入：
 
@@ -881,250 +1068,215 @@ AIMessage
 MessagesPlaceholder
 ```
 
-聊天记录：
-
-```python
-[
-    HumanMessage(...),
-    AIMessage(...),
-    HumanMessage(...),
-    AIMessage(...)
-]
-```
-
-Prompt：
-
-```python
-MessagesPlaceholder(
-    variable_name="chat_history"
-)
-```
-
-保留真实的：
+保存历史：
 
 ```text
 Human
 AI
 Human
 AI
+...
 ```
 
-消息角色关系。
+Prompt 中通过：
 
-实现：
-
-```text
-Chat History
-     ↓
-Final LLM
+```python
+MessagesPlaceholder(variable_name="chat_history")
 ```
 
-从单轮 RAG 升级为多轮 Conversational RAG。
+将真实角色消息插入对话上下文。
 
 ---
 
-## Stage 9：History-aware Retrieval
+## 2.11 Stage 8：History-aware Retrieval
 
-仅仅让最终 LLM 看到聊天历史还不够。
+为了解决追问中的代词和上下文依赖，增加 Query Rewrite。
 
-例如：
+测试：
 
 ```text
-Human:
+Q1:
 What is multi-head attention?
 
-Human:
+Q2:
 Why is it useful?
 ```
 
-如果 Retriever 直接搜索：
+系统成功改写为：
 
 ```text
-Why is it useful?
-```
-
-语义信息不足。
-
-因此加入 Query Rewrite：
-
-```text
-Chat History
-+
-Current Query
- ↓
-LLM Rewrite
- ↓
-Standalone Query
-```
-
-例如：
-
-```text
-Why is it useful?
-
-↓
-
 What are the benefits of using multi-head attention?
 ```
 
-然后：
+进一步测试：
 
 ```text
-Rewritten Query
- ↓
-Retriever
- ↓
-Relevant Documents
+Q3:
+How are its outputs combined?
 ```
 
-最终：
+能够改写成与 Multi-Head Attention 明确相关的独立问题。
+
+当前完整流程：
 
 ```text
+Original Query
+      │
+      ├────────────→ Final Question
+      │
+      ↓
 Chat History
-        ↓
-   Query Rewrite
-        ↓
+      ↓
+Query Rewrite
+      ↓
 Standalone Query
-        ↓
-    Retriever
-        ↓
-     Context
-        │
-        ├──────────────┐
-        │              │
-Original Query    Chat History
-        │              │
-        └──────┬───────┘
-               ↓
-             Prompt
-               ↓
-              LLM
-               ↓
-             Answer
+      ↓
+Retriever
+      ↓
+Relevant Context
+      │
+      └────────────┐
+                   ↓
+            Final Prompt
+          ├ Context
+          ├ Chat History
+          └ Original Query
+                   ↓
+                  LLM
+                   ↓
+                 Answer
 ```
 
-当前项目已经完成这一阶段。
+至此已经完成：
+
+> **Conversational RAG + History-aware Retrieval**
 
 ---
 
-# 🔨 Paper Agent 下一步
+## 2.12 下一步计划
 
-计划继续加入：
+接下来继续完善：
 
 ```text
 Source Citation
-        ↓
+ ↓
 Similarity Score / Threshold
-        ↓
+ ↓
 MMR Retrieval
-        ↓
+ ↓
 Reranker
-        ↓
+ ↓
 Multiple PDFs
-        ↓
+ ↓
 Document Management
-        ↓
+ ↓
 LangGraph
-        ↓
+ ↓
 Agentic RAG
-        ↓
-Web / arXiv Search Tool
-        ↓
+ ↓
+Web / arXiv Search
+ ↓
 Research Agent
 ```
 
-最终目标：
+随着项目继续开发，本章节会持续记录每一次新增功能、设计原因和实现过程。
+
+---
+
+# 3. 后续项目
+
+## 3.1 Research Agent
+
+计划在 Paper Agent 基础上进一步加入：
 
 ```text
-User Research Question
-        ↓
-Query Analysis
-        ↓
-Local Paper RAG
-        ↓
-External Paper Search
-        ↓
-Evidence Retrieval
-        ↓
-Answer / Summary
-        ↓
+LangGraph
+Tool Calling
+Planning
+Web Search
+arXiv Search
+Evidence Collection
 Citation
-        ↓
 Research Report
 ```
 
----
-
-# 🗺️ Project Roadmap
-
-| Project | Core Technologies | Status |
-|---|---|---|
-| **Paper Agent** | LangChain, RAG, Chroma, Ollama, Conversational RAG | 🚧 In Progress |
-| **Research Agent** | LangGraph, Tool Calling, Planning, Web / arXiv Search | 📋 Planned |
-| **MCP Agent** | MCP Client / Server, Files, GitHub, Database Tools | 📋 Planned |
-| **Multi-Agent Workflow** | LangGraph, Multi-Agent, Reflection, Human-in-the-loop | 📋 Planned |
-
----
-
-# 🧩 Current Tech Stack
+目标：
 
 ```text
-Language
-└── Python
-
-LLM
-├── Ollama
-├── OpenAI Compatible API
-└── Local Open-source Models
-
-LLM Framework
-├── LangChain
-└── LCEL
-
-RAG
-├── PyMuPDF
-├── RecursiveCharacterTextSplitter
-├── nomic-embed-text
-├── Chroma
-└── Retriever
-
-Agent
-├── ReAct
-├── Tool Calling
-├── Memory
-└── Query Rewrite
-
-Next
-├── LangGraph
-├── MCP
-├── Agentic RAG
-└── Multi-Agent
+Research Question
+ ↓
+Plan
+ ↓
+Search
+ ↓
+Retrieve
+ ↓
+Read
+ ↓
+Synthesize
+ ↓
+Citation
+ ↓
+Report
 ```
 
 ---
 
-# 🎯 Repository Goal
+## 3.2 MCP Agent
 
-这个仓库并不是简单收集各种 AI Demo。
-
-主要目标是：
-
-> 从底层机制开始理解 LLM 与 Agent，再逐步使用框架进行工程化实现，并通过完整项目形成可以解释、可以扩展、可以复现的 AI Agent 开发能力。
-
-学习方式：
+计划通过 MCP 将 Agent 与不同外部能力连接：
 
 ```text
-理解原理
+Agent
+ ↓
+MCP Client
+ ↓
+MCP Servers
+ ├── Files
+ ├── GitHub
+ ├── Database
+ └── Search
+```
+
+重点学习 MCP 的实际工程使用方式，而不仅停留在协议概念。
+
+---
+
+## 3.3 Multi-Agent Workflow
+
+后续计划进一步学习：
+
+```text
+Multi-Agent
+LangGraph
+Agent Collaboration
+Reflection
+Human-in-the-loop
+State Management
+```
+
+通过多个具有不同职责的 Agent 协同完成复杂任务。
+
+---
+
+# 学习方式
+
+整个仓库采用：
+
+```text
+理解概念
  ↓
 手动实现
  ↓
-框架重构
+观察运行结果
  ↓
 发现问题
  ↓
-逐步优化
+引入新技术解决问题
  ↓
-完整项目
+记录项目演进
 ```
 
-后续会持续更新 Paper Agent，并逐步推进 LangGraph、Agentic RAG、MCP 与 Multi-Agent 项目。
+基础知识部分用于持续积累 **面试知识体系**，项目部分用于记录 **真实工程实践过程**。
+
+后续学习到新的概念或完成新的项目功能时，会继续更新本 README。
