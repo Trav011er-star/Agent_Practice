@@ -1,0 +1,529 @@
+{
+  "paper": "Attention Is All You Need",
+  "pdf": "data/papers/Attention Is All You Need.pdf",
+  "page_note": "gold_pages 用的是 PyMuPDFLoader 的 0 起始页索引，第 0 页是标题页。",
+  "field_note": {
+    "id": "题号",
+    "question": "提问",
+    "category": "题型：fact 事实 / number 数字表格 / term 名词定义 / formula 公式",
+    "lang": "提问语言，en 英文；后续可加 zh 中文题测跨语言检索",
+    "gold_pages": "标准答案出现在哪些页。少数问题（比如 28.4 BLEU）在摘要和正文都出现，两页都算命中。",
+    "evidence": "标准答案的原文证据，检索回来的片段里必须包含这句话才算 evidence_hit。",
+    "reference_answer": "参考答案，给人看的，也为将来做生成质量评测做准备。"
+  },
+  "items": [
+    {
+      "id": 1,
+      "question": "Which conference was this paper published at, and in which year?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [0],
+      "evidence": "31st Conference on Neural Information Processing Systems (NIPS 2017)",
+      "reference_answer": "NIPS 2017 (the 31st Conference on Neural Information Processing Systems), held in Long Beach, CA, USA."
+    },
+    {
+      "id": 2,
+      "question": "What BLEU score does the model achieve on the WMT 2014 English-to-French translation task?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [0, 7],
+      "evidence": "state-of-the-art BLEU score of 41.8 after training for 3.5 days on eight GPUs",
+      "reference_answer": "41.8 BLEU."
+    },
+    {
+      "id": 3,
+      "question": "Who proposed scaled dot-product attention and multi-head attention?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [0],
+      "evidence": "Noam proposed scaled dot-product attention, multi-head attention and the parameter-free position representation",
+      "reference_answer": "Noam Shazeer, per the equal-contribution footnote on the title page."
+    },
+    {
+      "id": 4,
+      "question": "What is the arXiv identifier of this paper?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [0],
+      "evidence": "arXiv:1706.03762v7",
+      "reference_answer": "arXiv:1706.03762v7 (v7, 2 Aug 2023)."
+    },
+    {
+      "id": 5,
+      "question": "What fundamental limitation of recurrent models does the introduction point out?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [1],
+      "evidence": "This inherently sequential nature precludes parallelization within training examples",
+      "reference_answer": "Their inherently sequential nature prevents parallelization within a training example, which becomes critical at longer sequence lengths."
+    },
+    {
+      "id": 6,
+      "question": "Which three models does the paper cite as using convolutional neural networks to reduce sequential computation?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [1],
+      "evidence": "the Extended Neural GPU [16], ByteNet [18] and ConvS2S [9]",
+      "reference_answer": "Extended Neural GPU, ByteNet and ConvS2S."
+    },
+    {
+      "id": 7,
+      "question": "What is self-attention also called?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [1],
+      "evidence": "Self-attention, sometimes called intra-attention",
+      "reference_answer": "Intra-attention."
+    },
+    {
+      "id": 8,
+      "question": "What does the encoder do in the encoder-decoder structure?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [1],
+      "evidence": "the encoder maps an input sequence of symbol representations",
+      "reference_answer": "It maps an input sequence of symbol representations (x1, ..., xn) to a sequence of continuous representations z = (z1, ..., zn)."
+    },
+    {
+      "id": 9,
+      "question": "According to the Background section, which model is the first transduction model relying entirely on self-attention?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [1],
+      "evidence": "the Transformer is the first transduction model relying entirely on self-attention",
+      "reference_answer": "The Transformer."
+    },
+    {
+      "id": 10,
+      "question": "How many identical layers does the encoder stack contain?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [2],
+      "evidence": "the encoder is composed of a stack of N = 6 identical layers",
+      "reference_answer": "N = 6."
+    },
+    {
+      "id": 11,
+      "question": "What is the formula for the output of each sub-layer?",
+      "category": "formula",
+      "lang": "en",
+      "gold_pages": [2],
+      "evidence": "LayerNorm(x + Sublayer(x))",
+      "reference_answer": "LayerNorm(x + Sublayer(x))."
+    },
+    {
+      "id": 12,
+      "question": "What are the two sub-layers in each encoder layer?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [2],
+      "evidence": "The first is a multi-head self-attention mechanism, and the second is a simple, position-wise fully connected feed-forward network",
+      "reference_answer": "A multi-head self-attention mechanism, and a position-wise fully connected feed-forward network."
+    },
+    {
+      "id": 13,
+      "question": "What does the third sub-layer inserted in each decoder layer do?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [2],
+      "evidence": "the decoder inserts a third sub-layer, which performs multi-head attention over the output of the encoder stack",
+      "reference_answer": "It performs multi-head attention over the output of the encoder stack (encoder-decoder attention)."
+    },
+    {
+      "id": 14,
+      "question": "Why is masking applied in the decoder's self-attention sub-layer?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [2],
+      "evidence": "This masking, combined with fact that the output embeddings are offset by one position",
+      "reference_answer": "To prevent positions from attending to subsequent positions, so that the prediction for position i can depend only on the known outputs at positions less than i."
+    },
+    {
+      "id": 15,
+      "question": "What are the two most commonly used attention functions?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [3],
+      "evidence": "The two most commonly used attention functions are additive attention [2], and dot-product (multiplicative) attention",
+      "reference_answer": "Additive attention and dot-product (multiplicative) attention."
+    },
+    {
+      "id": 16,
+      "question": "Why do the authors scale the dot products by 1/sqrt(dk)?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [3],
+      "evidence": "for large values of dk, the dot products grow large in magnitude, pushing the softmax function into regions where it has extremely small gradients",
+      "reference_answer": "For large dk the dot products grow large in magnitude, pushing softmax into regions with extremely small gradients; scaling counteracts this."
+    },
+    {
+      "id": 17,
+      "question": "Which attention function is faster and more space-efficient in practice?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [3],
+      "evidence": "dot-product attention is much faster and more space-efficient in practice",
+      "reference_answer": "Dot-product attention, because it can be implemented with highly optimized matrix multiplication code."
+    },
+    {
+      "id": 18,
+      "question": "How many times are the queries, keys and values linearly projected in multi-head attention?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [3],
+      "evidence": "we found it beneficial to linearly project the queries, keys and values h times with different, learned linear projections",
+      "reference_answer": "h times, with different learned linear projections."
+    },
+    {
+      "id": 19,
+      "question": "Under what condition does additive attention outperform dot product attention?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [3],
+      "evidence": "additive attention outperforms dot product attention without scaling for larger values of dk [3]",
+      "reference_answer": "For larger values of dk, when the dot products are not scaled."
+    },
+    {
+      "id": 20,
+      "question": "What is the benefit of multi-head attention over a single attention head?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [4],
+      "evidence": "Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions",
+      "reference_answer": "It lets the model jointly attend to information from different representation subspaces at different positions; with a single head, averaging inhibits this."
+    },
+    {
+      "id": 21,
+      "question": "How many parallel attention heads does the model use?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [4, 8],
+      "evidence": "we employ h = 8 parallel attention layers, or heads",
+      "reference_answer": "h = 8 (for the base model)."
+    },
+    {
+      "id": 22,
+      "question": "What are the values of dk and dv for each attention head?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [4, 8],
+      "evidence": "For each of these we use dk = dv = dmodel/h = 64",
+      "reference_answer": "dk = dv = dmodel/h = 64."
+    },
+    {
+      "id": 23,
+      "question": "In the encoder-decoder attention layers, where do the queries, keys and values come from?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [4],
+      "evidence": "the queries come from the previous decoder layer, and the memory keys and values come from the output of the encoder",
+      "reference_answer": "Queries come from the previous decoder layer; memory keys and values come from the output of the encoder."
+    },
+    {
+      "id": 24,
+      "question": "What is the position-wise feed-forward network composed of?",
+      "category": "formula",
+      "lang": "en",
+      "gold_pages": [4],
+      "evidence": "This consists of two linear transformations with a ReLU activation in between",
+      "reference_answer": "Two linear transformations with a ReLU activation in between: FFN(x) = max(0, xW1 + b1)W2 + b2."
+    },
+    {
+      "id": 25,
+      "question": "What is the inner-layer dimensionality dff of the position-wise feed-forward network?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [4, 8],
+      "evidence": "the inner-layer has dimensionality dff = 2048",
+      "reference_answer": "dff = 2048 (base model)."
+    },
+    {
+      "id": 26,
+      "question": "Which weight matrix is shared in the model, and how are the embedding weights scaled?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [4],
+      "evidence": "we share the same weight matrix between the two embedding layers and the pre-softmax linear transformation",
+      "reference_answer": "The same weight matrix is shared between the two embedding layers and the pre-softmax linear transformation; embedding weights are multiplied by sqrt(dmodel)."
+    },
+    {
+      "id": 27,
+      "question": "What does Table 1 compare across different layer types?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [5],
+      "evidence": "Maximum path lengths, per-layer complexity and minimum number of sequential operations for different layer types",
+      "reference_answer": "Maximum path lengths, per-layer complexity, and the minimum number of sequential operations."
+    },
+    {
+      "id": 28,
+      "question": "How many sequentially executed operations does a self-attention layer require, compared with a recurrent layer?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [5],
+      "evidence": "a self-attention layer connects all positions with a constant number of sequentially executed operations, whereas a recurrent layer requires O(n) sequential operations",
+      "reference_answer": "Self-attention needs a constant number of sequential operations (O(1)); a recurrent layer needs O(n)."
+    },
+    {
+      "id": 29,
+      "question": "Why does the model need positional encodings?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [5],
+      "evidence": "we must inject some information about the relative or absolute position of the tokens in the sequence",
+      "reference_answer": "Because the model contains no recurrence and no convolution, so it needs explicit information about token positions."
+    },
+    {
+      "id": 30,
+      "question": "What functions are used to compute the positional encodings?",
+      "category": "formula",
+      "lang": "en",
+      "gold_pages": [5],
+      "evidence": "we use sine and cosine functions of different frequencies",
+      "reference_answer": "Sine and cosine functions of different frequencies."
+    },
+    {
+      "id": 31,
+      "question": "Why did the authors choose sinusoidal positional encoding over learned positional embeddings?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [5],
+      "evidence": "We chose the sinusoidal version because it may allow the model to extrapolate to sequence lengths longer than the ones encountered during training",
+      "reference_answer": "It may allow the model to extrapolate to sequence lengths longer than those seen during training. (The two performed nearly identically otherwise.)"
+    },
+    {
+      "id": 32,
+      "question": "Why is the path length between positions important for learning long-range dependencies?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [5],
+      "evidence": "Learning long-range dependencies is a key challenge in many sequence transduction tasks",
+      "reference_answer": "The shorter the paths that forward and backward signals must traverse between positions, the easier it is to learn long-range dependencies."
+    },
+    {
+      "id": 33,
+      "question": "How many sentence pairs are in the WMT 2014 English-German training dataset?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [6],
+      "evidence": "We trained on the standard WMT 2014 English-German dataset consisting of about 4.5 million sentence pairs",
+      "reference_answer": "About 4.5 million sentence pairs."
+    },
+    {
+      "id": 34,
+      "question": "How many sentences are in the WMT 2014 English-French dataset?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [6],
+      "evidence": "the significantly larger WMT 2014 English-French dataset consisting of 36M sentences",
+      "reference_answer": "36 million sentences."
+    },
+    {
+      "id": 35,
+      "question": "How many GPUs were used to train the models?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [6],
+      "evidence": "We trained our models on one machine with 8 NVIDIA P100 GPUs",
+      "reference_answer": "8 NVIDIA P100 GPUs on one machine."
+    },
+    {
+      "id": 36,
+      "question": "How many steps and how long did it take to train the base models?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [6],
+      "evidence": "We trained the base models for a total of 100,000 steps or 12 hours",
+      "reference_answer": "100,000 steps, about 12 hours."
+    },
+    {
+      "id": 37,
+      "question": "How many steps were the big models trained for?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [6, 8],
+      "evidence": "The big models were trained for 300,000 steps (3.5 days)",
+      "reference_answer": "300,000 steps (3.5 days)."
+    },
+    {
+      "id": 38,
+      "question": "What is the value of warmup_steps in the learning rate schedule?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [6],
+      "evidence": "We used warmup_steps = 4000",
+      "reference_answer": "warmup_steps = 4000."
+    },
+    {
+      "id": 39,
+      "question": "How long did each training step take for the base models?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [6],
+      "evidence": "each training step took about 0.4 seconds",
+      "reference_answer": "About 0.4 seconds per step."
+    },
+    {
+      "id": 40,
+      "question": "What does Table 2 compare?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [7],
+      "evidence": "The Transformer achieves better BLEU scores than previous state-of-the-art models on the English-to-German and English-to-French newstest2014 tests at a fraction of the training cost",
+      "reference_answer": "BLEU scores and training cost (FLOPs) on newstest2014 English-to-German and English-to-French, against prior models."
+    },
+    {
+      "id": 41,
+      "question": "What dropout rate is used for the base model?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [7, 8],
+      "evidence": "For the base model, we use a rate of Pdrop = 0.1",
+      "reference_answer": "Pdrop = 0.1."
+    },
+    {
+      "id": 42,
+      "question": "What is the effect of label smoothing on perplexity and BLEU?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [7],
+      "evidence": "This hurts perplexity, as the model learns to be more unsure, but improves accuracy and BLEU score",
+      "reference_answer": "It hurts perplexity but improves accuracy and BLEU score."
+    },
+    {
+      "id": 43,
+      "question": "What beam size was used for beam search during inference?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [7],
+      "evidence": "We used beam search with a beam size of 4",
+      "reference_answer": "Beam size 4, with length penalty alpha = 0.6."
+    },
+    {
+      "id": 44,
+      "question": "How many checkpoints were averaged for the big models?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [7],
+      "evidence": "For the big models, we averaged the last 20 checkpoints",
+      "reference_answer": "The last 20 checkpoints."
+    },
+    {
+      "id": 45,
+      "question": "What BLEU score does the big model achieve on English-to-French according to Section 6.1?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [7],
+      "evidence": "our big model achieves a BLEU score of 41.0, outperforming all of the previously published single models",
+      "reference_answer": "41.0 BLEU, at less than 1/4 the training cost of the previous state-of-the-art single model."
+    },
+    {
+      "id": 46,
+      "question": "What does Table 3 show?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [8],
+      "evidence": "Variations on the Transformer architecture",
+      "reference_answer": "Variations on the Transformer architecture: perplexity and BLEU on the English-to-German development set (newstest2013) for different hyperparameter settings."
+    },
+    {
+      "id": 47,
+      "question": "How much worse is single-head attention compared with the best setting?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [8],
+      "evidence": "While single-head attention is 0.9 BLEU worse than the best setting, quality also drops off with too many heads",
+      "reference_answer": "0.9 BLEU worse; quality also drops with too many heads."
+    },
+    {
+      "id": 48,
+      "question": "What happens when sinusoidal positional encoding is replaced with learned positional embeddings?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [8],
+      "evidence": "In row (E) we replace our sinusoidal positional encoding with learned positional embeddings [9], and observe nearly identical results to the base model",
+      "reference_answer": "Nearly identical results to the base model (row (E) of Table 3)."
+    },
+    {
+      "id": 49,
+      "question": "What is the effect of reducing the attention key size dk?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [8],
+      "evidence": "reducing the attention key size dk hurts model quality",
+      "reference_answer": "It hurts model quality, suggesting a more sophisticated compatibility function than dot product may help."
+    },
+    {
+      "id": 50,
+      "question": "How many training sentences were used for the WSJ-only parsing experiment?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [8],
+      "evidence": "about 40K training sentences",
+      "reference_answer": "About 40K sentences from the Wall Street Journal portion of the Penn Treebank."
+    },
+    {
+      "id": 51,
+      "question": "What does Table 4 show?",
+      "category": "term",
+      "lang": "en",
+      "gold_pages": [9],
+      "evidence": "The Transformer generalizes well to English constituency parsing",
+      "reference_answer": "English constituency parsing results (F1 on Section 23 of the WSJ), comparing the Transformer against prior parsers."
+    },
+    {
+      "id": 52,
+      "question": "What F1 score does a 4-layer Transformer achieve in the semi-supervised parsing setting?",
+      "category": "number",
+      "lang": "en",
+      "gold_pages": [9],
+      "evidence": "Transformer (4 layers) semi-supervised 92.7",
+      "reference_answer": "92.7 F1."
+    },
+    {
+      "id": 53,
+      "question": "Where is the code for the models available?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [9],
+      "evidence": "https://github.com/tensorflow/tensor2tensor",
+      "reference_answer": "https://github.com/tensorflow/tensor2tensor"
+    },
+    {
+      "id": 54,
+      "question": "What future work do the authors mention in the conclusion?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [9],
+      "evidence": "We plan to extend the Transformer to problems involving input and output modalities other than text",
+      "reference_answer": "Extending the Transformer to non-text input/output modalities (images, audio, video) and investigating local restricted attention mechanisms."
+    },
+    {
+      "id": 55,
+      "question": "In the attention visualizations, what kind of dependency does the attention head shown for the word 'making' follow?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [12],
+      "evidence": "Many of the attention heads attend to a distant dependency of the verb",
+      "reference_answer": "A long-distance dependency of the verb 'making', completing the phrase 'making...more difficult'."
+    },
+    {
+      "id": 56,
+      "question": "What linguistic phenomenon do the two attention heads shown in Figure 4 appear to handle?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [13],
+      "evidence": "Two attention heads, also in layer 5 of 6, apparently involved in anaphora resolution",
+      "reference_answer": "Anaphora resolution."
+    },
+    {
+      "id": 57,
+      "question": "What do the attention heads in Figure 5 seem to be related to?",
+      "category": "fact",
+      "lang": "en",
+      "gold_pages": [14],
+      "evidence": "Many of the attention heads exhibit behaviour that seems related to the structure of the sentence",
+      "reference_answer": "The structure of the sentence."
+    }
+  ]
+}

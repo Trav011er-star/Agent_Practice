@@ -1,3 +1,7 @@
+import sys
+
+import config
+from src.health import OllamaNotReady, ensure_for
 from src.loader import load_pdf
 from src.splitter import split_documents
 from src.embedding import create_vector_store, load_vector_store
@@ -6,7 +10,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import (
     RunnableLambda,
-    RunnablePassthrough,
 )
 
 # 导入消息类型：
@@ -22,11 +25,7 @@ from langchain_core.prompts import MessagesPlaceholder
 # RAG_v2: Retrieval-Augmented Generation
 # 多轮 RAG：第二轮时， llm 能看到第一轮记录
 
-pdf_path = "data/papers/Attention Is All You Need.pdf"
-
-
-def calculate_average(numbers):
-    total = sum(numbers)
+pdf_path = str(config.DEFAULT_PDF)
 
 
 # 1. 加载数据
@@ -100,6 +99,14 @@ def RAG_retrieval(query, vector_store):
 
 def RAG_workflow():
 
+    # 先自检：问答既要用向量模型也要用生成模型
+    try:
+        ensure_for(need_llm=True)
+    except OllamaNotReady as exc:
+        print("\n[启动自检失败]\n", file=sys.stderr)
+        print(exc, file=sys.stderr)
+        sys.exit(1)
+
     # 保存当前会话的历史消息
     chat_history = []
 
@@ -107,8 +114,8 @@ def RAG_workflow():
     vector_store = load_vector_store()
     llm = get_llm_model()
 
-    # 检索最相关的 3 个 chunk
-    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+    # 检索最相关的 RETRIEVE_K 个 chunk
+    retriever = vector_store.as_retriever(search_kwargs={"k": config.RETRIEVE_K})
 
     # Prompt 中插入历史对话：在工作流中，接收一个字典，并将键的对应值填入
     prompt = ChatPromptTemplate.from_messages(

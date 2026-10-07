@@ -1,4 +1,20 @@
-langchain
-langchain-community
-pymupdf
-langchain_text_splitters
+# ---------- 核心框架 ----------
+langchain==1.4.2
+langchain-core==1.6.3
+langchain-community==0.4.2
+langchain-text-splitters==1.1.2
+
+# ---------- 向量库 + 本地模型（Ollama）----------
+langchain-chroma==1.1.0
+chromadb==1.5.9
+langchain-ollama==1.1.0
+
+# ---------- PDF 解析 ----------
+pymupdf==1.28.2
+
+# ---------- 重排（cross-encoder）----------
+# 只有跑 hybrid_rerank 才需要，纯向量/BM25 检索不需要。
+# 这里装的是 torch 的 CPU 版（约 124 MB）；有 N 卡想加速可以换 CUDA 版，但体积大很多。
+# 装得慢就换国内源：pip install -i https://mirrors.aliyun.com/pypi/simple/ torch sentence-transformers
+torch==2.14.1
+sentence-transformers==6.1.0

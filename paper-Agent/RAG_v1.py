@@ -1,3 +1,6 @@
+import sys
+
+from src.health import OllamaNotReady, ensure_for
 from src.loader import load_pdf
 from src.splitter import split_documents
 from src.embedding import create_vector_store, load_vector_store
@@ -165,6 +168,14 @@ def RAG_step_by_step():
 
 
 def RAG_workflow():
+    # 先自检：问答既要用向量模型也要用生成模型
+    try:
+        ensure_for(need_llm=True)
+    except OllamaNotReady as exc:
+        print("\n[启动自检失败]\n", file=sys.stderr)
+        print(exc, file=sys.stderr)
+        sys.exit(1)
+
     # ----------------------------- 在线查询 -----------------------------
     # 查询（自然语言）
     query = "Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions. What is the meaning of this sentence?"
