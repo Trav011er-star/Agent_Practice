@@ -23,8 +23,13 @@ DEFAULT_PDF = DATA_DIR / "Attention Is All You Need.pdf"
 
 # ---------- 分块（chunking）----------
 # chunk_size 越大，单个片段装的信息越多但越"杂"；越小越精准但可能丢上下文。
-# 这个值不是拍脑袋定的，而是靠 eval/run_eval.py 跑实验比出来的。
-CHUNK_SIZE = 1000
+#
+# 这个值不是拍脑袋定的，是靠 eval/run_eval.py 跑实验比出来的（57 题，见 README 5.2）：
+#   500  -> Recall@1 75.4%  Recall@3 91.2%  MRR 0.841   <- 最优
+#   1000 -> Recall@1 57.9%  Recall@3 80.7%  MRR 0.706   <- 原硬编码值，三个里最差
+#   2000 -> Recall@1 54.4%  Recall@3 84.2%  MRR 0.702
+# 所以默认取 500。
+CHUNK_SIZE = 500
 CHUNK_OVERLAP = 200
 
 # ---------- 检索 ----------
