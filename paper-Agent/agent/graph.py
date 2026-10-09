@@ -15,80 +15,159 @@ from langgraph.graph import StateGraph, START, END
 
 # TypedDict : 一种写法，用来描述"这个盒子里有哪些字段"
 from typing import TypedDict
+from engine import retrieve
+import json
+from src.llm import get_llm_model
+import config
+from pathlib import Path
 
 
 # ============================================================
 # 第 2 件事：定义 state（图里流动的那个箱子）
 # ============================================================
-# 这里先只放一个字段，名字叫 text，类型是字符串。
-# 后面做真 Agent 时，这个箱子会变复杂（放问题、证据、答案……）。
-# 读取数据仍然用字典方式 state["text"]
-# class 子类(父类):
-# 这里继承了字典类，并指定里面的 键
-# 节点通过 state["键名"] 读取数据时，该键必须存在，否则会报 KeyError。
-# 不要求传入字典的所有键与 State 完全一致。
 class State(TypedDict):
-    # 已经跳了几轮
-    hops: int
-    items: list[str]
+    question: str  # 用户的问题（从头到尾不变）
+    # （大模型根据之前轮次的问题和已检索结果改写这轮的问题）
+    query: str  # 这一轮要用的检索词
+    seen: list[str]  # 已经收过的 chunk_id，用来去重
+    items: list[str]  # 攒下来的证据【文字】
+    hops: int  # 已经跳了几轮
+    enough: bool  # 大模型判断是否结束
+    answer: str  # 最终检索结果
 
 
-MAX_HOPS = 5
+# ============================================================
+# 全局变量
+# ============================================================
+# 最大跳转轮次
+MAX_HOPS = 10
+
+# 规定返回的格式的 json
+print("[LLM] 调用 JSON 格式大模型")
+_llm_json = get_llm_model(
+    provider=config.LLM_PROVIDER,
+    format="json",
+)  # 需要 LLM 返回 json,判断检索情况
+print("[LLM] 调用 TEXT 格式大模型")
+_llm_text = get_llm_model(provider=config.LLM_PROVIDER)  # 需要 LLM 说人话,得到检索结果
+
+# ============================================================
+# 系统提示词
+# ============================================================
+PROMPT_JUDGE = """你是一个检索质量评审员。你的工作是判断"目前检索到的证据"够不够回答"用户的问题"。
+【用户的问题】
+{question}
+【目前已经检索到的证据】
+{evidence}                         
+判断标准（严格一点）：
+- 只有当问题所需的**关键数字/事实**都明确出现在证据里，才算够
+- 如果只答对了一半（比如问的是英文→德文，却只找到英文→法文的数据），算**不够**                      
+只输出一个 JSON 对象。不要解释，不要 markdown 代码块。
+{{"enough": true, "next_query": null}}
+{{"enough": false, "next_query": "下一轮要用的英文检索词"}}
+next_query 的要求：
+1. 必须是**英文**（因为论文是英文写的）
+2. 要和已有的证据**不重复**，专注于**还缺的那部分信息**
+3. 简短，3~8 个词，像搜索引擎的关键词
+"""
+
+PROMPT_DONE = """根据下面的【资料】回答【问题】。
+【问题】
+{question}
+【资料】
+{evidence}
+要求：
+1. 只根据【资料】回答，资料里没有的信息**不要编造**
+2. 回答里每个关键事实后面要标出处，格式：[论文名, p.页码]
+   （资料每段开头的方括号里就是出处，直接抄过来）
+3. 如果资料不足以回答，就直接说"资料里没有提到"
+"""
+
+
 # ============================================================
 # 第 3 件事：节点
-# 默认情况下，节点 return 中的同名字段会覆盖 State 中的旧值；没有返回的字段会保留
-# 节点返回的字典，是覆盖，不是追加
-# 假设箱子里现在是 items = ["旧条目"]
-
-
-# return {"items": ["新条目"]}                    # ❌ 旧条目没了！变成 ["新条目"]
-# return {"items": state["items"] + ["新条目"]}    # ✅ 旧的还在，变成 ["旧条目", "新条目"]
 # ============================================================
-# 节点 = 一个普通函数。规矩只有一条：
-#   收一个 state 进来，返回一个 dict，表示"我要改哪些字段"。
-# def node_a(state: State) -> dict:
-#     print("① node_a 收到一条证据")
-#     # print("node_a 拿到的 items =", state["items"])
-#     # 返回的 dict 会被**合并**进 state。
-#     # 这行的意思是：把 text 改成 "A 改过了"
-#     return {
-#         "text": "A 改过了",
-#         "items": state["items"] + ["A 收集到的证据"],
-#     }
-
-
-# def node_b(state: State) -> dict:
-#     print("② node_b 收到一条证据")
-#     # 这里应该看到 A 改过之后的值 —— 这就是 state 的作用：
-#     # 让后面的工位能看到前面工位留下的东西。
-#     # print("node_b 拿到的 items =", state["items"])
-#     return {
-#         "text": "B 改过了",
-#         "items": state["items"] + ["B 收集到的证据"],
-#     }
-
-
 def node_collect(state: State) -> dict:
-    """收集一条证据。每被调用一次，就多一条。"""
-    n = state["hops"] + 1  # 这是第几轮
-    print(f"  [collect] 第 {n} 轮：收到一条证据")
+    n = state["hops"] + 1
+    query = state["query"]
+    seen = state["seen"]
+
+    # TODO A：算这轮要取多少条。第 n 轮取 3n 条。
+    # 相当于每一轮新增 3 条新信息
+    k = 3 * n
+
+    # TODO B：真的去检索。调 retrieve(问题, k=上面那个数)
+    docs = retrieve(query=query, k=k)
+
+    # TODO C：过滤。只留下 chunk_id 还没在 seen 里的那些。
+    #         每个元素 doc 的 id 在 doc.metadata["chunk_id"]
+    fresh = [d for d in docs if d.metadata["chunk_id"] not in seen]
+
+    def _source_label(doc) -> str:
+        """给一条证据生成出处标签，例如 [Attention Is All You Need, p.7]"""
+        paper = Path(doc.metadata.get("source", "?")).stem  # 去掉路径和 .pdf
+        page = doc.metadata.get("page", "?")
+        return f"[{paper}, p.{page}]"
+
+    new_texts = [f"{_source_label(d)} {d.page_content}" for d in fresh]
+
+    new_ids = [d.metadata["chunk_id"] for d in fresh]
+
+    print(f"  [collect] 第 {n} 轮：撒网 k={k}，新收 {len(fresh)} 条")
+
     return {
-        # 累加，注意这里加了"第几轮的证据"，方便看出是两个不同轮次加的
-        "items": state["items"] + [f"第{n}轮的证据"],
-        # hops 也要累加
+        "items": state["items"] + new_texts,
+        "seen": seen + new_ids,
         "hops": n,
     }
 
+    # 多跳:
+    #         原问题              ← 「我要去哪儿」（防止跑偏）
+    # 已攒的证据 items        ← 「我已经有什么」（防止重复问）
+    # 上一轮的 query          ← 「我刚才是怎么问的」
+    #               │
+    #               ▼
+    #          大模型 想一下
+    #               │
+    #               ▼
+    #    「还缺什么 → 下一轮该问什么」进而构建新一轮更准确的 query
+
 
 def node_judge(state: State) -> dict:
-    """只报数，不改数据。"""
-    print(f"  [judge] 现在有 {len(state['items'])} 条证据，已跳 {state['hops']} 轮")
-    return {}
+    """问大模型：证据够了吗？不够的话下一轮问什么？"""
+    question = state["question"]
+    evidence = "\n\n".join(state["items"])  # 多条证据用空行拼成一整段
+
+    # TODO 1：把模板填好，得到最终要发给大模型的字符串
+    # 填入数据
+    prompt = PROMPT_JUDGE.format(question=question, evidence=evidence)
+
+    # TODO 2：调用大模型（变量 _llm_json 已经在上面建好了，直接 _llm_json.invoke(...)）
+    #         返回的是一个"消息对象"，正文在它的 .content 属性里
+    reply = _llm_json.invoke(prompt)
+
+    # TODO 3：reply.content 是一段 JSON 字符串，用 json.loads 解析成字典
+    data = json.loads(reply.content)
+
+    # TODO 4：从字典里取两个值
+    enough = data["enough"]
+    #         防御：如果模型没给出可用的 next_query（None 或空字符串），
+    #              就退回用原问题，别让 state["query"] 变成 None 把下一轮搞崩
+    next_query = data.get("next_query") or question
+
+    print(f"  [judge] 第 {state['hops']} 轮 → 够了吗：{enough}｜下轮问：{next_query}")
+
+    return {"enough": enough, "query": next_query}
 
 
 def node_done(state: State) -> dict:
     print("  [done] 够了，可以答了")
-    return {}
+    question = state["question"]
+    evidence = "\n\n".join(state["items"])  # 多条证据用空行拼成一整段
+    prompt = PROMPT_DONE.format(question=question, evidence=evidence)
+    answer = _llm_text.invoke(prompt).content
+    print(f"检索结果: {answer}")
+    return {"answer": answer}
 
 
 # ============================================================
@@ -97,22 +176,8 @@ def node_done(state: State) -> dict:
 # 规矩：收一个 state，返回一个字符串（也就是"下一步去哪"）。
 # 这个函数**不改数据**。
 def route_after_judge(state: State) -> str:
-    # # TODO: 写一个 if/else ——
-    # #   如果证据数量 >= 2，返回 "enough"
-    # #   否则返回 "not_enough"
-    # if len(state["items"]) >= 2:
-    #     return "enough"
-    # return "not_enough"
-    # # 返回的字符串必须和下面映射表左边的 key 一模一样（拼错会报错）
-
-    # TODO：三种情况，按顺序判断（顺序很重要，想想为什么）
-    #   1) 证据够了：len(state["items"]) >= 4      -> 返回 "go_done"
-    #   2) 跳太多次了：state["hops"] >= MAX_HOPS  -> 返回 "go_done"   ← 刹车
-    #   3) 以上都不是                              -> 返回 "go_again"
-    #
-    # 提示：三个 return，前面两个都带 if，最后一个是兜底。
-    #       为什么"刹车"要放在"够不够"后面判断？（提示：够了的优先级更高）
-    if len(state["items"]) >= 99 or state["hops"] >= MAX_HOPS:
+    # 根据目前检索的条目数量和轮次决定是否继续或停止
+    if state["enough"] or state["hops"] >= MAX_HOPS:
         return "go_done"
     return "go_again"
 
@@ -121,19 +186,10 @@ def route_after_judge(state: State) -> str:
 # 第 4 件事：把节点连成图
 # ============================================================
 builder = StateGraph(State)  # 建一个空图，并声明它的 state 用上面那个 State
-# builder.add_node("a", node)  # 加一个节点，取名叫 "a"，内容是 node_a 这个函数
-# builder.add_node("b", node_b)  # 再加一个，叫 "b"
-# builder.add_node("judge", judge)
-# builder.add_node("enough", node_enough)
-# builder.add_node("not_enough", node_not_enough)
 
 builder.add_node("collect", node_collect)
 builder.add_node("done", node_done)
 builder.add_node("judge", node_judge)
-
-# builder.add_edge(START, "a")  # 起点 -> a
-# builder.add_edge("a", "b")  # a -> b       ← 这就是"传送带"
-# builder.add_edge("b", "judge")  # b -> 路由
 
 builder.add_edge(START, "collect")
 builder.add_edge("collect", "judge")
@@ -164,15 +220,16 @@ graph = builder.compile()
 # 第 5 件事：跑起来
 # ============================================================
 if __name__ == "__main__":
+    q = "What is the BLEU score of the big model on WMT 2014 English-to-German?"
     print("开始运行")
-    # invoke = 启动。参数是**初始 state**，也就是"箱子里一开始装什么"。
-    # 传入的是一个字典
-    # 输出的是 state
     result = graph.invoke(
         {
-            "hops": 0,
+            "question": q,
+            "query": q,
+            "seen": [],
             "items": [],
+            "hops": 0,
         }
     )
-    print(result)
+    print(f"state = {result}")
     print("运行结束")

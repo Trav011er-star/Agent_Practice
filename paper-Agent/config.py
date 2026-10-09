@@ -10,6 +10,7 @@
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # ---------- 路径 ----------
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -17,6 +18,9 @@ DATA_DIR = PROJECT_ROOT / "data" / "papers"
 VECTORSTORE_DIR = PROJECT_ROOT / "vectorstore" / "chroma_db"
 EVAL_DIR = PROJECT_ROOT / "eval"
 EVAL_RESULT_DIR = EVAL_DIR / "results"
+
+# ---------- 环境变量 ----------
+load_dotenv(PROJECT_ROOT / ".env")
 
 # ---------- 数据 ----------
 DEFAULT_PDF = DATA_DIR / "Attention Is All You Need.pdf"
@@ -102,3 +106,17 @@ def collection_name_for(chunk_size: int) -> str:
 
 # 默认集合名（对应默认的 CHUNK_SIZE）
 COLLECTION_NAME = collection_name_for(CHUNK_SIZE)
+
+# ---------- 云端模型（DeepSeek）----------
+# 密钥从 .env 读，绝不写进代码。
+# .env 已经在 .gitignore 里，不会被提交。
+# 前面依旧通过 load_dotenv 把 API_KEY 读进环境变量
+# 这里的环境变量是指 python.exe 进程中的，他会复制系统的环境/用户变量，并优先使用系统里的
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-chat"
+
+# ---------- 用哪家（全局开关）----------
+# "ollama"   → 本地 qwen2.5:3b
+# "deepseek" → 云端 API
+LLM_PROVIDER = "deepseek"
