@@ -850,55 +850,80 @@ paper-Agent/
 
 ```text
 Python
-LangChain
-LCEL
-Ollama
-Chroma
-PyMuPDF
-nomic-embed-text
+LangChain / LCEL
+LangGraph            # 多跳 Agent 编排
+Ollama               # 本地 embedding（nomic-embed-text）
+DeepSeek API         # 云端生成（OpenAI 兼容接口），可一行切回本地 qwen2.5:3b
+Chroma               # 向量库
+PyMuPDF              # PDF 解析
+BM25 + RRF           # 自实现混合检索
+cross-encoder        # 重排
 ```
 
 ---
 
 ## 2.3 当前系统架构
 
+### 建库（离线）
+
 ```text
 PDF
  ↓
-PyMuPDFLoader
+PyMuPDFLoader（按页解析，保留 page / source 元数据）
  ↓
-Documents
+Text Splitter（chunk_size=500, overlap=200，参数由评测选出）
  ↓
-Text Splitter
+Embedding（nomic-embed-text，本地 Ollama）
  ↓
-Chunks
- ↓
-Embedding
- ↓
-Chroma Vector Store
+Chroma Vector Store（按 chunk_size 分集合，便于做消融实验）
 ```
 
-查询流程：
+### 检索（在线）
 
 ```text
-User Question
+User Query
  ↓
-Chat History + Query Rewrite
+┌────────────────────┬────────────────────┐
+│ 向量检索（语义）    │ BM25（关键词）      │   各召回 20 条
+└────────────────────┴────────────────────┘
  ↓
-Standalone Retrieval Query
+RRF 融合（只用排名不用分数，k=60）
  ↓
-Retriever
+cross-encoder 重排（ms-marco-MiniLM-L-6-v2）
  ↓
-Relevant Chunks
- ↓
-Context
- ↓
-Prompt + Original Question + Chat History
- ↓
-LLM
- ↓
-Answer
+Top-3 Chunks
 ```
+
+### 生成
+
+```text
+User Question + Chat History
+ ↓
+Query Rewrite（指代消解）              ← RAG_v2.py
+ ↓
+检索（上面那段）
+ ↓
+Prompt + Chunks + Question
+ ↓
+LLM（DeepSeek / 本地 qwen2.5:3b，由 config.LLM_PROVIDER 一行切换）
+ ↓
+Answer（内嵌 [论文名, p.页码] 出处）
+```
+
+### 多跳 Agent（`agent/graph.py`）
+
+```text
+START → collect（检索） → judge（大模型判断证据够不够）
+             ↑                          │
+             └──── 不够：改写 query ─────┤
+                                        │ 够了
+                                        ↓
+                                     done（带出处生成） → END
+
+        MAX_HOPS 是刹车，防止 judge 一直判"不够"时无限循环
+```
+
+> 完整说明、评测数据与踩坑记录见 [`paper-Agent/README.md`](paper-Agent/README.md)。
 
 ---
 
@@ -1155,24 +1180,26 @@ Relevant Context
 
 ## 2.12 下一步计划
 
-接下来继续完善：
+### 已完成（截至 2026-10-10）
+
+- [x] **Reranker** —— 召回 20 条后 cross-encoder 精排。实测发现"重排一定有用"是错的：
+      第一个模型是**负作用**，换英文对口的模型才涨（详见 `paper-Agent/README.md` 5.3）
+- [x] **Source Citation** —— 回答内嵌 `[论文名, p.页码]`，可追溯到片段级 `chunk_id`
+- [x] **混合检索** —— BM25 + 向量 + RRF，Recall@3 从 91.2% 提到 98.2%
+- [x] **LangGraph** —— 多跳 Agent 编排（`collect` / `judge` / `done` + 条件边 + 刹车）
+- [x] **Agentic RAG** —— 检索 → 判断证据是否充分 → 改写 query → 再检索 → 带出处生成
+- [x] **模型接入** —— DeepSeek（OpenAI 兼容接口），`LLM_PROVIDER` 一行切换本地/云端
+
+### 接下来
 
 ```text
-Source Citation
- ↓
+Multiple PDFs              ← 当前唯一瓶颈：库里只有一篇论文，
+ ↓                            judge 每轮第 1 轮就判"够了"，多跳从未真正触发
 Similarity Score / Threshold
  ↓
 MMR Retrieval
  ↓
-Reranker
- ↓
-Multiple PDFs
- ↓
 Document Management
- ↓
-LangGraph
- ↓
-Agentic RAG
  ↓
 Web / arXiv Search
  ↓
@@ -1180,6 +1207,8 @@ Research Agent
 ```
 
 随着项目继续开发，本章节会持续记录每一次新增功能、设计原因和实现过程。
+
+> 逐日进展与踩坑记录见 `paper-Agent/docs/worklog-*.md`。
 
 ---
 

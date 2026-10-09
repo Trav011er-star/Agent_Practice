@@ -2,6 +2,10 @@
 
 基于 RAG 的论文阅读助手：把 PDF 论文建成可检索的向量库，支持多轮问答，并且**用一套可复现的评测集量化检索质量**。
 
+在检索之上搭了一层 **LangGraph 多跳 Agent**：由大模型自己判断"证据够不够"，
+不够就改写检索词再搜一轮，够了就生成**带出处引用**的答案。
+生成模型支持**本地 Ollama / 云端 DeepSeek 一键切换**。
+
 当前聚焦单篇论文（*Attention Is All You Need*）打通全链路，后续扩展为多论文文献助手。
 
 ---
@@ -14,11 +18,14 @@
 | 分块 | RecursiveCharacterTextSplitter，参数可配 | `src/splitter.py` |
 | 向量化 | Ollama `nomic-embed-text`（本地） | `src/embedding.py` |
 | 存储 | Chroma 本地持久化，按 chunk_size 分集合 | `src/embedding.py` |
-| 生成 | Ollama `qwen2.5:3b`（本地） | `src/llm.py` |
+| 生成 | 本地 Ollama `qwen2.5:3b` / 云端 DeepSeek，**一键切换** | `src/llm.py` |
 | **混合检索** | **自实现 BM25 + 向量检索，RRF 融合** | **`src/retrieval.py`** |
-| **重排** | bge-reranker cross-encoder 精排 | `src/retrieval.py` |
+| **重排** | cross-encoder 精排（模型按语言/领域**实测选型**） | `src/retrieval.py` |
 | 单轮 RAG | LCEL 管道 `prompt \| llm \| StrOutputParser` | `RAG_v1.py` |
 | 多轮 RAG | query rewrite（指代消解）+ 对话历史注入 | `RAG_v2.py` |
+| **多跳 Agent** | **LangGraph：检索 → 判断证据是否充分 → 改写 query → 再检索，带 `MAX_HOPS` 刹车** | **`agent/graph.py`** |
+| **检索引擎缓存** | 多跳每一轮不再重建 BM25 索引 / 重排模型 | `agent/engine.py` |
+| **答案溯源** | 回答内嵌 `[论文名, p.页码]`，可追溯到片段级 `chunk_id` | `agent/graph.py` |
 | **检索评测** | **57 条标注问题，Recall@k / AnswerHit@k / MRR** | **`eval/`** |
 | 建库脚本 | 支持多 chunk_size 批量建库、可重建 | `ingest.py` |
 
@@ -28,16 +35,22 @@
 
 ```
 paper-Agent/
-├── config.py              # 所有可调参数集中在这里
+├── config.py              # 所有可调参数集中在这里（含 LLM_PROVIDER 全局开关）
 ├── ingest.py              # 建库：PDF -> 分块 -> 向量化 -> Chroma
 ├── RAG_v1.py              # 单轮 RAG
 ├── RAG_v2.py              # 多轮 RAG（含 query rewrite）
 ├── requirements.txt
+├── .env                   # 密钥（已 gitignore，需自行创建，见 3.2）
+├── agent/
+│   ├── graph.py           # LangGraph 多跳 Agent：collect / judge / done
+│   ├── engine.py          # 检索引擎的进程级缓存
+│   └── graph_demo.py      # 早期"假证据"版骨架（学习过程存档，非有效代码）
+├── docs/                  # 逐日工作记录（含踩坑、实验与结论）
 ├── src/
 │   ├── loader.py          # PDF 解析
 │   ├── splitter.py        # 分块
 │   ├── embedding.py       # 向量化 + Chroma 读写
-│   ├── llm.py             # 大模型
+│   ├── llm.py             # 大模型工厂（provider 切换）
 │   ├── retrieval.py       # 混合检索（BM25 + 向量 + RRF）与重排
 │   └── health.py          # 启动自检：Ollama 是否可用、模型是否已下载
 ├── eval/
@@ -53,6 +66,8 @@ paper-Agent/
 ---
 
 ## 3. 环境准备
+
+### 3.1 安装 Ollama 与 Python 依赖
 
 需要本地安装 [Ollama](https://ollama.com/) 并下载两个模型：
 
@@ -87,6 +102,33 @@ pip install -r requirements.txt
 > ```bash
 > pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
 > ```
+
+### 3.2 配置密钥（只有用 DeepSeek 才需要）
+
+`config.py` 里的 `LLM_PROVIDER` 决定走哪一家：
+
+```python
+LLM_PROVIDER = "deepseek"   # "ollama" -> 本地 qwen2.5:3b；"deepseek" -> 云端 API
+```
+
+选 `deepseek` 时，需要在 **`config.py` 同目录**下建一个 `.env` 文件：
+
+```
+DEEPSEEK_API_KEY=你的key
+```
+
+三条设计约定：
+
+- **密钥不进代码**：代码里只有 `os.getenv("DEEPSEEK_API_KEY")`，没有任何硬编码。
+- **密钥不进仓库**：`.env` 已在 `.gitignore` 中，不会被提交。
+- **读不到就报错**：拿不到 key 时直接 `RuntimeError`，而不是带着空 key 去发请求
+  （否则只会收到一个没信息量的 `401`，白花时间排查）。
+
+> 选 `ollama` 走本地时**完全不需要** `.env`，把 `LLM_PROVIDER` 改成 `"ollama"` 即可。
+> 两条路都能跑通全链路，切换只改这一行。
+
+> 注意：`.env` 本身只是一个**文本文件**，是 `load_dotenv()` 把它读成环境变量的。
+> 而且 `load_dotenv` 默认 `override=False`——**系统/用户环境变量优先于 `.env`**。
 
 ---
 
@@ -128,12 +170,42 @@ python RAG_v2.py     # 多轮对话
 python RAG_v1.py     # 单轮
 ```
 
+### 多跳 Agent
+
+```bash
+python agent/graph.py
+```
+
+流程是三个节点：
+
+```text
+        ┌─────────────────────────────┐
+        ↓                             │ 不够：改写 query
+START → collect（检索） → judge（判断够不够）
+                              │
+                              └─ 够了 → done（生成带出处的答案） → END
+```
+
+- `collect`：调 `retrieve()` 取片段，用 `chunk_id` 去重后累加进 `items`
+- `judge`：把「问题 + 已有证据」给大模型，要它回一个 JSON
+  （`{"enough": bool, "next_query": str}`）
+- `done`：把证据给大模型，要求**只依据资料作答**并标注 `[论文名, p.页码]`
+
+`MAX_HOPS` 是刹车，防止 `judge` 一直判"不够"时无限循环。
+
+> 前提：先按 3.2 配好 `.env`（若走 DeepSeek），并确保已建库（`python ingest.py`）。
+> `agent/engine.py` 会自动把项目根目录插进 `sys.path`，所以在项目根目录下直接跑即可。
+
 ---
 
 ## 4.5 常见问题排查
 
 所有入口脚本（`ingest.py` / `eval/run_eval.py` / `RAG_v1.py` / `RAG_v2.py`）
 启动时都会先调用 `src/health.py` 做自检，把"报错看不懂"的情况翻译成人话。
+
+> `agent/graph.py` 目前没有做这层自检，但它同样依赖 Ollama 的 **embedding** 服务
+> （生成模型虽然换成了 DeepSeek，检索那一侧的向量化仍是本地 `nomic-embed-text`）。
+> 所以跑 Agent 之前，**Ollama 仍必须是启动状态**。
 
 下面两个坑都实际踩过，记录在此：
 
@@ -195,6 +267,37 @@ HF_ENDPOINT = "https://hf-mirror.com"   # 实测 0.6s 返回
 所以环境变量必须在导入它之前设好——本项目放在 `config.py` 顶层，
 任何入口脚本都会先 `import config`，因此一定生效。
 
+### 坑 5：接 DeepSeek 时踩的两个坑
+
+**(a) 忘了调用 `load_dotenv()`**
+
+**症状**：启动就报 `RuntimeError: 没读到 DEEPSEEK_API_KEY`，但 `.env` 明明建好了。
+
+**原因**：`os.getenv()` 读的是**进程的环境变量**，不是那个文件。
+`.env` 要变成环境变量，必须有人**调用** `load_dotenv()`——
+只 `import` 进来是没用的。这和"函数定义了但没人调用"是同一类问题。
+
+**本项目已处理**：`config.py` 顶层调用 `load_dotenv(PROJECT_ROOT / ".env")`，
+且位置在 `os.getenv(...)` **之前**。
+
+**(b) OpenAI 系模型的 JSON 模式跟 Ollama 不一样**
+
+**原因**：两家"要求 JSON 输出"的说法不同——
+
+| | 怎么写 |
+|---|---|
+| Ollama | `ChatOllama(..., format="json")` |
+| OpenAI 系 / DeepSeek | `model_kwargs={"response_format": {"type": "json_object"}}` |
+
+而且 OpenAI 系有个**很容易踩的附加条件**：
+**prompt 里必须出现 "json" 这个词本身**，否则 API 直接报错。
+所以 `judge` 的 prompt 能用（写了"只输出一个 JSON 对象"），
+而一个不含 "json" 字样的 prompt 拿去要 JSON 就会当场失败。
+
+**本项目已处理**：`src/llm.py` 的 `get_llm_model()` 里做了归一化——
+调用方统一传 `format="json"`，工厂内部转成各家的写法。
+但 **prompt 里那句"只输出一个 JSON 对象"不能省**（见 `PROMPT_JUDGE`）。
+
 ---
 
 ## 5. 评测结果
@@ -211,13 +314,25 @@ HF_ENDPOINT = "https://hf-mirror.com"   # 实测 0.6s 返回
 ### 5.2 chunk_size 消融实验
 
 评测集：57 条问题（覆盖事实、数字表格、名词定义、公式四类），检索深度 k=10。
-模型：`nomic-embed-text`。**纯检索评测，不涉及生成，结果可完全复现。**
+模型：`nomic-embed-text`。纯检索评测，不涉及生成。
 
 | chunk_size | 片段数 | Recall@1 | Recall@3 | Recall@5 | AnswerHit@1 | AnswerHit@3 | AnswerHit@5 | MRR@10 |
 |-----------:|-------:|---------:|---------:|---------:|------------:|------------:|------------:|-------:|
 | **500** | 129 | **75.4%** | **91.2%** | **94.7%** | 50.9% | 73.7% | 77.2% | **0.841** |
 | 1000 | 52 | 57.9% | 80.7% | 91.2% | 42.1% | 64.9% | 73.7% | 0.706 |
 | 2000 | 27 | 54.4% | 84.2% | 93.0% | 45.6% | **75.4%** | **82.5%** | 0.702 |
+
+> **可复现性的边界（实测）**
+>
+> 同一 Ollama 进程内连跑两次，结果**逐位一致**。但**换一个 Ollama 进程**之后，
+> **Recall@1 会抖约 ±5 个百分点**，而 **Recall@3 / Recall@5 / MRR 完全不动**。
+>
+> 逐题对比后定位到：变化的题目**全部**是"第 1 名 ↔ 第 2 名互换"
+> （RR 1.00 ↔ 0.50）——也就是**检索到的内容没变，抖的只是近似并列时谁排前面**。
+> 疑似根因是不同进程的 embedding 浮点差异，但**该假设未经证实**。
+>
+> 所以本表的主结论请看 **Recall@3 / MRR**，**Recall@1 只作参考**。
+> 完整排查过程见 [docs/worklog-2026-10-08.md](docs/worklog-2026-10-08.md) §9。
 
 ### 5.3 检索策略消融实验
 
@@ -300,8 +415,37 @@ RRF 只用**排名**不用**分数**：`score = Σ 1/(k + rank)`，
 - [x] 混合检索：BM25 + 向量（论文里 `BLEU`、`WMT 2014` 这类专有名词，关键词匹配更准）
 - [x] 重排（rerank）：召回 20 条后用 cross-encoder 精排——**实测第一个模型是负作用，
       换模型后才涨**，详见 5.3（这条比"重排一定有用"更值得写）
-- [ ]答案溯源：回答里附 `[论文名, p.12]` 引用，可点击跳转
-- [ ] 生成质量评测：Faithfulness / Answer Relevancy，需要换更强的模型
+- [x] LangGraph 多跳 Agent：检索 → 判断证据是否充分 → 改写 query → 再检索 → 带出处生成
+- [x] 模型可切换：接上 DeepSeek（OpenAI 兼容接口），`LLM_PROVIDER` 一行切换。
+      换的动机是一次**控制变量实验**——在**完全相同的证据**下，本地 `qwen2.5:3b`
+      **10 次全部**判"证据不够"，DeepSeek 第 1 轮就判对，
+      即**"判断力不足"是模型能力问题，不是 prompt 工程问题**
+- [x] 答案溯源（基础版）：回答内嵌 `[论文名, p.页码]`，可追溯到片段级 `chunk_id`
+- [ ] 🔴 **加 3-5 篇论文（当前唯一瓶颈）**。库里只有一篇论文，答案唾手可得，
+      `judge` 每次都在第 1 轮就判"够了"——**多跳与 query 改写从未真正触发过**，
+      该 Agent 目前的行为接近 `RAG_v2.py`。主题定为「LLM 奠基主线」：
+      `Attention Is All You Need (2017) → BERT (2018) → GPT-3 (2020) → RAG (2020) → ReAct (2022)`
+- [ ] 有语料之后再修（已诊断，但**缺语料无法验证**，故暂不动手）：
+      - `judge` 会**复读**上一轮的 query（prompt 从未告知它"已经试过什么"）
+      - 证据无长度上限，多轮后"证据爆炸"，触发 *lost in the middle*
+      - `k = 3n` 的"撒大网"补丁改为固定 `k = 3`，让 query 成为唯一变量
+- [ ] 答案溯源（进阶版）：引用可点击跳转
+- [ ] 生成质量评测：Faithfulness / Answer Relevancy
 - [ ] 多论文支持：跨论文检索与综述
-- [ ] LangGraph 多跳 Agent：问题拆解 -> 并行检索 -> 汇总 -> 自我检查
 - [ ] 服务化：FastAPI + 流式输出 + Docker 部署
+
+---
+
+## 7. 工作记录
+
+`docs/` 下是逐日的工作记录，写的是**过程和踩坑**，不是结论摘要——
+包括方案被推翻、实验做错、以及自己的假设后来站不住的地方。
+
+- [2026-10-07](docs/worklog-2026-10-07.md) — chunk_size 消融、混合检索、重排选型
+- [2026-10-08](docs/worklog-2026-10-08.md) — LangGraph 入门、`MAX_HOPS` 刹车、评测可复现性的边界
+- [2026-10-09](docs/worklog-2026-10-09.md) — 接上真实检索与 LLM 判断、"判断力"控制变量实验
+- [2026-10-10](docs/worklog-2026-10-10.md) — 接入 DeepSeek、provider 工厂、全链路打通
+
+> ⚠️ 两处**已知的诚实性说明**：
+> - 5.2 的 `Recall@1` 会跨进程抖动（已加前提说明）；
+> - 「多跳 Agent」目前**尚未真正触发多跳**，原因写在 6 的路线里（缺语料）。
