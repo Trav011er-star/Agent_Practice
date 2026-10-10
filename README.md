@@ -77,7 +77,7 @@
 - [2.9 Stage 6：LCEL RAG Chain](#29-stage-6lcel-rag-chain)
 - [2.10 Stage 7：Chat History](#210-stage-7chat-history)
 - [2.11 Stage 8：History-aware Retrieval](#211-stage-8history-aware-retrieval)
-- [2.12 下一步计划](#212-下一步计划)
+- [2.12 已实现的功能](#212-已实现的功能)
 
 ---
 
@@ -1178,9 +1178,9 @@ Relevant Context
 
 ---
 
-## 2.12 下一步计划
+## 2.12 已实现的功能
 
-### 已完成（截至 2026-10-10）
+### 截至 2026-10-10
 
 - [x] **Reranker** —— 召回 20 条后 cross-encoder 精排。实测发现"重排一定有用"是错的：
       第一个模型是**负作用**，换英文对口的模型才涨（详见 `paper-Agent/README.md` 5.3）
@@ -1194,26 +1194,6 @@ Relevant Context
       多跳从未触发）。**结论：多跳是否触发取决于问题是否跨文档，而不是代码写得对不对**
 - [x] **Agent 鲁棒性** —— 防复读（`tried` 列表）、修正 `enough` 语义
       （"可以作答了"而非"答案找到了"）、`temperature=0` 保证行为可复现
-
-### 接下来
-
-```text
-健壮性：json 解析容错 / 检索异常降级
- ↓
-Agent 层量化评测（答案要点命中率 / 引用准确率 / 幻觉率）
- ↓
-多跳 vs 单跳对照实验（证明多跳的实际收益）
- ↓
-Similarity Score / Threshold
- ↓
-MMR Retrieval
- ↓
-Document Management
- ↓
-Web / arXiv Search
- ↓
-Research Agent
-```
 
 随着项目继续开发，本章节会持续记录每一次新增功能、设计原因和实现过程。
 
