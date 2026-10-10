@@ -1189,12 +1189,21 @@ Relevant Context
 - [x] **LangGraph** —— 多跳 Agent 编排（`collect` / `judge` / `done` + 条件边 + 刹车）
 - [x] **Agentic RAG** —— 检索 → 判断证据是否充分 → 改写 query → 再检索 → 带出处生成
 - [x] **模型接入** —— DeepSeek（OpenAI 兼容接口），`LLM_PROVIDER` 一行切换本地/云端
+- [x] **多论文语料 + 多跳真正跑通** —— 语料扩到 5 篇（158 页 / 1687 片段），
+      跨文档问题下自动 2~4 轮迭代检索（此前只有一篇论文，`judge` 每轮第 1 轮就判"够了"，
+      多跳从未触发）。**结论：多跳是否触发取决于问题是否跨文档，而不是代码写得对不对**
+- [x] **Agent 鲁棒性** —— 防复读（`tried` 列表）、修正 `enough` 语义
+      （"可以作答了"而非"答案找到了"）、`temperature=0` 保证行为可复现
 
 ### 接下来
 
 ```text
-Multiple PDFs              ← 当前唯一瓶颈：库里只有一篇论文，
- ↓                            judge 每轮第 1 轮就判"够了"，多跳从未真正触发
+健壮性：json 解析容错 / 检索异常降级
+ ↓
+Agent 层量化评测（答案要点命中率 / 引用准确率 / 幻觉率）
+ ↓
+多跳 vs 单跳对照实验（证明多跳的实际收益）
+ ↓
 Similarity Score / Threshold
  ↓
 MMR Retrieval
