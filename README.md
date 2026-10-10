@@ -81,14 +81,6 @@
 
 ---
 
-## 3. 后续项目
-
-- [3.1 Research Agent](#31-research-agent)
-- [3.2 MCP Agent](#32-mcp-agent)
-- [3.3 Multi-Agent Workflow](#33-multi-agent-workflow)
-
----
-
 # 1. 基础知识
 
 ## 1.1 LLM 基础
@@ -1198,82 +1190,6 @@ Relevant Context
 随着项目继续开发，本章节会持续记录每一次新增功能、设计原因和实现过程。
 
 > 逐日进展与踩坑记录见 `paper-Agent/docs/worklog-*.md`。
-
----
-
-# 3. 后续项目
-
-## 3.1 Research Agent
-
-计划在 Paper Agent 基础上进一步加入：
-
-```text
-LangGraph
-Tool Calling
-Planning
-Web Search
-arXiv Search
-Evidence Collection
-Citation
-Research Report
-```
-
-目标：
-
-```text
-Research Question
- ↓
-Plan
- ↓
-Search
- ↓
-Retrieve
- ↓
-Read
- ↓
-Synthesize
- ↓
-Citation
- ↓
-Report
-```
-
----
-
-## 3.2 MCP Agent
-
-计划通过 MCP 将 Agent 与不同外部能力连接：
-
-```text
-Agent
- ↓
-MCP Client
- ↓
-MCP Servers
- ├── Files
- ├── GitHub
- ├── Database
- └── Search
-```
-
-重点学习 MCP 的实际工程使用方式，而不仅停留在协议概念。
-
----
-
-## 3.3 Multi-Agent Workflow
-
-后续计划进一步学习：
-
-```text
-Multi-Agent
-LangGraph
-Agent Collaboration
-Reflection
-Human-in-the-loop
-State Management
-```
-
-通过多个具有不同职责的 Agent 协同完成复杂任务。
 
 ---
 
