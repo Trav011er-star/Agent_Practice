@@ -68,9 +68,7 @@ def run_one_config(gold_set, chunk_size, mode, reranker, detail=False):
     k = config.EVAL_RETRIEVE_K
     per_item = []
     for item in gold_set["items"]:
-        docs = retriever.search(
-            item["question"], k=k, mode=mode, reranker=reranker
-        )
+        docs = retriever.search(item["question"], k=k, mode=mode, reranker=reranker)
         per_item.append(evaluate_item(docs, item))
 
     result = summarize(per_item)
@@ -177,7 +175,9 @@ def main():
     # 重排模型只加载一次（加载很慢，要复用）
     reranker = None
     if "hybrid_rerank" in args.mode:
-        print(f"\n加载重排模型 {config.RERANK_MODEL}（首次运行需从 HuggingFace 下载）...")
+        print(
+            f"\n加载重排模型 {config.RERANK_MODEL}（首次运行需从 HuggingFace 下载）..."
+        )
         reranker = Reranker()
         reranker.model  # 触发加载，把耗时和报错暴露在这里而不是循环里
         print("重排模型就绪。")

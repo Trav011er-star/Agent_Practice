@@ -58,15 +58,45 @@ def create_vector_store(documents, collection_name=None, ids=None):
     # 是在"把这批 documents/chunks 加入到 Chroma 中"。
     # 重复运行会导致有重复的向量存储数据。
     # —— 想避免重复，请用 ingest.py --rebuild，它会先清空同名集合。
-    vector_store = Chroma.from_documents(
-        documents=documents,
-        embedding=embedding_model,
-        ids=ids,
-        persist_directory=str(config.VECTORSTORE_DIR),
-        collection_name=collection_name,
-    )
+    # vector_store = Chroma.from_documents(
+    #     documents=documents,
+    #     embedding=embedding_model,
+    #     ids=ids,
+    #     persist_directory=str(config.VECTORSTORE_DIR),
+    #     collection_name=collection_name,
+    # )
 
-    return vector_store
+    db = None
+    # 每次处理 step 个 chunk
+    step = config.EMBED_BATCH_SIZE
+    total = len(documents)
+
+    # TODO 1: 用 range(0, total, step) 切片遍历
+    for start in range(0, total, step):
+        # TODO 2: 切出这一批的 documents 和**对应的**ids（ids 必须跟着一起切，否则对不上）
+        batch = documents[start : start + step]
+        batch_ids = ids[start : start + step] if ids else None
+
+        if db is None:
+            # TODO 3: 第一批 —— 还是用from_documents，它会顺便把 collection 建出来
+            #         参数照抄你现在这版，只是 documents/ids换成 batch
+            db = Chroma.from_documents(
+                documents=batch,
+                embedding=embedding_model,
+                ids=batch_ids,
+                persist_directory=str(config.VECTORSTORE_DIR),
+                collection_name=collection_name,
+            )
+
+        else:
+            # TODO 4: 之后每批 —— 用 add_documents追加进同一个 collection
+            # 前面已经建好向量库了，此时 add 新的文件进去会自动转为向量
+            db.add_documents(batch, ids=batch_ids)
+
+        # TODO 5: 打印进度，建库要跑一两分钟，别让它静默
+        print(f"  已写入 {min(start + step, total)}/{total}")
+
+    return db
 
 
 def load_vector_store(collection_name=None):

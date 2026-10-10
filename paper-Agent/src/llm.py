@@ -27,7 +27,7 @@ import config
 
 def get_llm_model(provider="ollama", **kwargs):
     # provider="deepseek" → 走 DeepSeek API
-    # provider="ollama"   → 走本地（默认，保持向后兼容）**kwargs):
+    # provider="ollama"   → 走本地（默认，保持向后兼容）
     # kwargs 原样透传给 ChatOllama（比如 format="json"）
     print("[LLM] 开始调用大模型 ...")
     print(f"[LLM] provider = {provider}")
@@ -38,7 +38,7 @@ def get_llm_model(provider="ollama", **kwargs):
 
         # 把 Ollama 中对大模型返回格式设置形式转成 OpenAI 的设置形式
         format = kwargs.pop("format", None)
-        if format:
+        if format == "json":
             kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
 
         llm = ChatOpenAI(

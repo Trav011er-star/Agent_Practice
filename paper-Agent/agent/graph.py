@@ -19,7 +19,6 @@ from engine import retrieve
 import json
 from src.llm import get_llm_model
 import config
-from pathlib import Path
 
 
 # ============================================================
@@ -34,22 +33,28 @@ class State(TypedDict):
     hops: int  # 已经跳了几轮
     enough: bool  # 大模型判断是否结束
     answer: str  # 最终检索结果
+    tried: list[str]
 
 
 # ============================================================
 # 全局变量
 # ============================================================
 # 最大跳转轮次
-MAX_HOPS = 10
+MAX_HOPS = 5
 
 # 规定返回的格式的 json
 print("[LLM] 调用 JSON 格式大模型")
+# 都用 temperature=0 ，方便结果复现和在找不到结果时提前结束
 _llm_json = get_llm_model(
     provider=config.LLM_PROVIDER,
     format="json",
+    temperature=0,
 )  # 需要 LLM 返回 json,判断检索情况
 print("[LLM] 调用 TEXT 格式大模型")
-_llm_text = get_llm_model(provider=config.LLM_PROVIDER)  # 需要 LLM 说人话,得到检索结果
+_llm_text = get_llm_model(
+    provider=config.LLM_PROVIDER,
+    temperature=0,
+)  # 需要 LLM 说人话,得到检索结果
 
 # ============================================================
 # 系统提示词
@@ -61,7 +66,12 @@ PROMPT_JUDGE = """你是一个检索质量评审员。你的工作是判断"目�
 {evidence}                         
 判断标准（严格一点）：
 - 只有当问题所需的**关键数字/事实**都明确出现在证据里，才算够
-- 如果只答对了一半（比如问的是英文→德文，却只找到英文→法文的数据），算**不够**                      
+- 如果只答对了一半（比如问的是英文→德文，却只找到英文→法文的数据），算**不够**   
+- 如果已经检索了多轮、换过很多检索词，证据里始终找不到答案，
+  **也判 enough = true**（表示"可以作答了"，作答内容就是"资料里没有"）。
+  不要因为"没找到"就一直判 false。    
+【已经问过的检索词】（next_query 绝不能和这些重复）
+{tried}              
 只输出一个 JSON 对象。不要解释，不要 markdown 代码块。
 {{"enough": true, "next_query": null}}
 {{"enough": false, "next_query": "下一轮要用的英文检索词"}}
@@ -105,8 +115,10 @@ def node_collect(state: State) -> dict:
 
     def _source_label(doc) -> str:
         """给一条证据生成出处标签，例如 [Attention Is All You Need, p.7]"""
-        paper = Path(doc.metadata.get("source", "?")).stem  # 去掉路径和 .pdf
+        paper = doc.metadata.get("paper", "?")  # 建库时已经写好了论文名
         page = doc.metadata.get("page", "?")
+        # page 是 0 起算的（PyMuPDF 的规定），显示时 +1 才对得上人翻的页码
+        page = page + 1 if isinstance(page, int) else "?"
         return f"[{paper}, p.{page}]"
 
     new_texts = [f"{_source_label(d)} {d.page_content}" for d in fresh]
@@ -116,9 +128,10 @@ def node_collect(state: State) -> dict:
     print(f"  [collect] 第 {n} 轮：撒网 k={k}，新收 {len(fresh)} 条")
 
     return {
-        "items": state["items"] + new_texts,
+        "items": state["items"] + new_texts,  # 用 + 造新 list
         "seen": seen + new_ids,
         "hops": n,
+        "tried": state["tried"] + [query],
     }
 
     # 多跳:
@@ -137,10 +150,10 @@ def node_judge(state: State) -> dict:
     """问大模型：证据够了吗？不够的话下一轮问什么？"""
     question = state["question"]
     evidence = "\n\n".join(state["items"])  # 多条证据用空行拼成一整段
-
+    tried_text = "\n".join(state["tried"])
     # TODO 1：把模板填好，得到最终要发给大模型的字符串
     # 填入数据
-    prompt = PROMPT_JUDGE.format(question=question, evidence=evidence)
+    prompt = PROMPT_JUDGE.format(question=question, evidence=evidence, tried=tried_text)
 
     # TODO 2：调用大模型（变量 _llm_json 已经在上面建好了，直接 _llm_json.invoke(...)）
     #         返回的是一个"消息对象"，正文在它的 .content 属性里
@@ -161,7 +174,11 @@ def node_judge(state: State) -> dict:
 
 
 def node_done(state: State) -> dict:
-    print("  [done] 够了，可以答了")
+    if state["enough"]:
+        print("  [done] judge 认为证据够了，开始作答")
+    else:
+        print(f"  [done] 跳满 {MAX_HOPS} 轮证据仍不足，如实作答")
+
     question = state["question"]
     evidence = "\n\n".join(state["items"])  # 多条证据用空行拼成一整段
     prompt = PROMPT_DONE.format(question=question, evidence=evidence)
@@ -220,16 +237,23 @@ graph = builder.compile()
 # 第 5 件事：跑起来
 # ============================================================
 if __name__ == "__main__":
-    q = "What is the BLEU score of the big model on WMT 2014 English-to-German?"
+    # 涉及一篇论文，一次就能回答
+    q = {
+        "one": "What is the BLEU score of the big model on WMT 2014 English-to-German?",
+        "can't answer": "What is Hamburger",
+        "multi jump": "Compare the pretraining objectives of BERT and GPT-3",
+    }
+
     print("开始运行")
     result = graph.invoke(
         {
-            "question": q,
-            "query": q,
+            "question": q["can't answer"],
+            "query": q["can't answer"],
             "seen": [],
             "items": [],
             "hops": 0,
+            "tried": [q["can't answer"]],
         }
     )
-    print(f"state = {result}")
+    # print(f"state = {result}")
     print("运行结束")

@@ -78,6 +78,8 @@ if HF_ENDPOINT:
 
 # ---------- 模型 ----------
 EMBEDDING_MODEL = "nomic-embed-text"
+EMBED_BATCH_SIZE = 100
+
 LLM_MODEL = "qwen2.5:3b"
 
 # ---------- Ollama 服务地址 ----------
@@ -96,16 +98,21 @@ OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 
 # ---------- 向量库命名 ----------
 # 每种 chunk_size 用一个独立的 collection，互不覆盖，这样才能做对比实验。
+# # 单论文
 COLLECTION_PREFIX = "attention_paper"
+# 多论文
+MULTI_COLLECTION_PREFIX = "papers"
 
 
-def collection_name_for(chunk_size: int) -> str:
+def collection_name_for(chunk_size: int, corpus: str = "single") -> str:
     """按 chunk_size 生成集合名，例如 attention_paper_1000"""
-    return f"{COLLECTION_PREFIX}_{chunk_size}"
+    if corpus == "single":
+        return f"{COLLECTION_PREFIX}_{chunk_size}"
+    return f"{MULTI_COLLECTION_PREFIX}_{chunk_size}"
 
 
 # 默认集合名（对应默认的 CHUNK_SIZE）
-COLLECTION_NAME = collection_name_for(CHUNK_SIZE)
+COLLECTION_NAME = collection_name_for(CHUNK_SIZE, corpus="single")
 
 # ---------- 云端模型（DeepSeek）----------
 # 密钥从 .env 读，绝不写进代码。

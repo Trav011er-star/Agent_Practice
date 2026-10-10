@@ -30,7 +30,12 @@ def get_engine():
     if _retriever is None:
         print("[engine] 第一次调用，开始造引擎 ...")
         print("[engine] 正在加载向量库 + 建 BM25 索引 ...")
-        vector_store = load_vector_store()  # ① 打开向量库
+        vector_store = load_vector_store(
+            config.collection_name_for(
+                config.CHUNK_SIZE,
+                corpus="multi",
+            )
+        )  # ① 打开向量库
         _retriever = HybridRetriever(vector_store)  # ② 用向量库包出检索器
         _reranker = Reranker()  # 这一步只是建了个空壳
         _reranker.model  # 碰一下这个属性，模型才真的加载
