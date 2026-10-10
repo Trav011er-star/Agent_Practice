@@ -13,71 +13,25 @@
 
 # 目录
 
-## 1. 基础知识
+**1. 基础知识**
 
-### 1.1 LLM 基础
-- [Token](#111-token)
-- [BPE](#112-bpe)
-- [Embedding](#113-embedding)
-- [Transformer](#114-transformer)
-- [Self-Attention](#115-self-attention)
-- [Multi-Head Attention](#116-multi-head-attention)
-- [Position Encoding 与 RoPE](#117-position-encoding-与-rope)
-- [Decoder-only 与 Causal Mask](#118-decoder-only-与-causal-mask)
-- [KV Cache](#119-kv-cache)
-- [Context Window](#1110-context-window)
-- [Temperature](#1111-temperature)
+| 子章节 | 里面有什么 |
+|:--|:--|
+| [**1.1 LLM 基础**](#11-llm-基础) | [Token](#111-token) · [BPE](#112-bpe) · [Embedding](#113-embedding) · [Transformer](#114-transformer) · [Self-Attention](#115-self-attention) · [Multi-Head Attention](#116-multi-head-attention) · [Position Encoding 与 RoPE](#117-position-encoding-与-rope) · [Decoder-only 与 Causal Mask](#118-decoder-only-与-causal-mask) · [KV Cache](#119-kv-cache) · [Context Window](#1110-context-window) · [Temperature](#1111-temperature) |
+| [**1.2 LLM 应用基础**](#12-llm-应用基础) | [Prompt Engineering](#121-prompt-engineering) · [LLM API 与 OpenAI Compatible API](#122-llm-api-与-openai-compatible-api) · [Ollama 与本地模型](#123-ollama-与本地模型) |
+| [**1.3 Agent 基础**](#13-agent-基础) | [什么是 Agent](#131-什么是-agent) · [Tool Calling / Function Calling](#132-tool-calling--function-calling) · [ReAct](#133-react) · [Plan-and-Solve](#134-plan-and-solve) · [Reflection](#135-reflection) · [Memory](#136-memory) |
+| [**1.4 RAG 基础**](#14-rag-基础) | [什么是 RAG](#141-什么是-rag) · [Document 与 Chunk](#142-document-与-chunk) · [Embedding 与语义检索](#143-embedding-与语义检索) · [Vector Database](#144-vector-database) · [Retriever](#145-retriever) · [Conversational RAG](#146-conversational-rag) · [History-aware Retrieval](#147-history-aware-retrieval) |
+| [**1.5 LangChain / Agent 工程**](#15-langchain--agent-工程) | [LangChain](#151-langchain) · [LCEL](#152-lcel) · [Runnable](#153-runnable) · [RunnableLambda](#154-runnablelambda) · [RunnablePassthrough](#155-runnablepassthrough) |
+| [**1.6 MCP**](#16-mcp) | [MCP 是什么](#161-mcp-是什么) · [MCP Client / Server](#162-mcp-client--server) · [MCP 与 Tool Calling 的区别](#163-mcp-与-tool-calling-的区别) |
 
-### 1.2 LLM 应用基础
-- [Prompt Engineering](#121-prompt-engineering)
-- [LLM API 与 OpenAI Compatible API](#122-llm-api-与-openai-compatible-api)
-- [Ollama 与本地模型](#123-ollama-与本地模型)
+**2. Paper Agent**
 
-### 1.3 Agent 基础
-- [什么是 Agent](#131-什么是-agent)
-- [Tool Calling / Function Calling](#132-tool-calling--function-calling)
-- [ReAct](#133-react)
-- [Plan-and-Solve](#134-plan-and-solve)
-- [Reflection](#135-reflection)
-- [Memory](#136-memory)
-
-### 1.4 RAG 基础
-- [什么是 RAG](#141-什么是-rag)
-- [Document 与 Chunk](#142-document-与-chunk)
-- [Embedding 与语义检索](#143-embedding-与语义检索)
-- [Vector Database](#144-vector-database)
-- [Retriever](#145-retriever)
-- [Conversational RAG](#146-conversational-rag)
-- [History-aware Retrieval](#147-history-aware-retrieval)
-
-### 1.5 LangChain / Agent 工程
-- [LangChain](#151-langchain)
-- [LCEL](#152-lcel)
-- [Runnable](#153-runnable)
-- [RunnableLambda](#154-runnablelambda)
-- [RunnablePassthrough](#155-runnablepassthrough)
-
-### 1.6 MCP
-- [MCP 是什么](#161-mcp-是什么)
-- [MCP Client / Server](#162-mcp-client--server)
-- [MCP 与 Tool Calling 的区别](#163-mcp-与-tool-calling-的区别)
-
----
-
-## 2. Paper Agent
-
-- [2.1 项目目标](#21-项目目标)
-- [2.2 技术栈](#22-技术栈)
-- [2.3 当前系统架构](#23-当前系统架构)
-- [2.4 Stage 1：PDF Loading](#24-stage-1pdf-loading)
-- [2.5 Stage 2：Text Splitting](#25-stage-2text-splitting)
-- [2.6 Stage 3：Embedding](#26-stage-3embedding)
-- [2.7 Stage 4：Chroma Vector Store](#27-stage-4chroma-vector-store)
-- [2.8 Stage 5：Retriever](#28-stage-5retriever)
-- [2.9 Stage 6：LCEL RAG Chain](#29-stage-6lcel-rag-chain)
-- [2.10 Stage 7：Chat History](#210-stage-7chat-history)
-- [2.11 Stage 8：History-aware Retrieval](#211-stage-8history-aware-retrieval)
-- [2.12 已实现的功能](#212-已实现的功能)
+| | | |
+|:--|:--|:--|
+| [2.1 项目目标](#21-项目目标) | [2.2 技术栈](#22-技术栈) | [2.3 当前系统架构](#23-当前系统架构) |
+| [2.4 Stage 1：PDF Loading](#24-stage-1pdf-loading) | [2.5 Stage 2：Text Splitting](#25-stage-2text-splitting) | [2.6 Stage 3：Embedding](#26-stage-3embedding) |
+| [2.7 Stage 4：Chroma Vector Store](#27-stage-4chroma-vector-store) | [2.8 Stage 5：Retriever](#28-stage-5retriever) | [2.9 Stage 6：LCEL RAG Chain](#29-stage-6lcel-rag-chain) |
+| [2.10 Stage 7：Chat History](#210-stage-7chat-history) | [2.11 Stage 8：History-aware Retrieval](#211-stage-8history-aware-retrieval) | [2.12 已实现的功能](#212-已实现的功能) |
 
 ---
 
