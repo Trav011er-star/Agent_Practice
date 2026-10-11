@@ -22,6 +22,39 @@ import config
 
 
 # ============================================================
+# 防雷：清洗函数
+# ============================================================
+def _clean_json(raw: str) -> str:
+    """把大模型返回的"脏"文本，洗成一段能交给 json.loads 的文本。
+
+    要对付两种脏法：
+      1. 被 ```json ... ``` 包起来的
+      2. 前后带废话的，比如：好的，我的判断是：{"enough": true, ...}
+    """
+    # TODO 1：先删掉代码块围栏 —— 把 "```json" 和 "```" 这两个子串去掉。。
+    #   大模型爱用 Markdown 代码块来包 JSON。Markdown 里，代码块的写法就是三个反引号开头、三个反引号结尾：
+    #   ```json
+    #   {"enough": true, "next_query": null}
+    #   ```
+    raw = raw.replace("```json", "")
+    raw = raw.replace("```", "")
+
+    # ┌───────┬──────────┬────────────────────┬─────────────────────┐
+    # │       │ 从哪边找  │        返回        │        记忆          │
+    # ├───────┼──────────┼────────────────────┼─────────────────────┤
+    # │ find  │ 左 → 右   │ 第一个出现的下标    │ 无前缀 = 默认        │
+    # ├───────┼──────────┼────────────────────┼─────────────────────┤
+    # │ rfind │ 右 → 左   │ 最后一个出现的下标  │ r = right / reverse │
+    # └───────┴──────────┴────────────────────┴─────────────────────┘
+    # TODO 2：再截出最外层的花括号 —— 只要【第一个 {】到【最后一个 }】之间。
+    index1 = raw.find("{")
+    index2 = raw.rfind("}")
+    # 左闭右开
+    raw = raw[index1 : index2 + 1]
+    return raw
+
+
+# ============================================================
 # 第 2 件事：定义 state（图里流动的那个箱子）
 # ============================================================
 class State(TypedDict):
@@ -107,7 +140,11 @@ def node_collect(state: State) -> dict:
     k = 3 * n
 
     # TODO B：真的去检索。调 retrieve(问题, k=上面那个数)
-    docs = retrieve(query=query, k=k)
+    try:
+        docs = retrieve(query=query, k=k)
+    except Exception as e:
+        print(f"  [collect] [!!!] 检索失败：{type(e).__name__}: {e}")
+        docs = []  # ← 降级成"这轮啥也没捞到"
 
     # TODO C：过滤。只留下 chunk_id 还没在 seen 里的那些。
     #         每个元素 doc 的 id 在 doc.metadata["chunk_id"]
@@ -160,13 +197,42 @@ def node_judge(state: State) -> dict:
     reply = _llm_json.invoke(prompt)
 
     # TODO 3：reply.content 是一段 JSON 字符串，用 json.loads 解析成字典
-    data = json.loads(reply.content)
+    #          【为什么整块都包在 try 里】下面三件事都可能炸，缺一个 try 就白写：
+    #            ① _clean_json  —— reply.content 万一不是字符串（比如 None）
+    #                               None.replace(...) 会抛 AttributeError
+    #            ② json.loads    —— 文本不是合法 JSON → JSONDecodeError
+    #            ③ data.get(...) —— 模型返回的是【合法 JSON 但不是对象】
+    #                               比如 ["enough", true]，data 就成了 list，
+    #                               list 没有 .get → AttributeError
+    try:
+        raw = _clean_json(reply.content)
+        data = json.loads(raw)
+        raw_enough = data.get("enough", False)
+        # 防御：如果模型没给出可用的 next_query（None 或空字符串），
+        #      就退回用原问题，别让 state["query"] 变成 None 把下一轮搞崩
+        # 如果没给下一个问题，那么 data.get("next_query") = None，使用 question
+        next_query = data.get("next_query") or question
 
-    # TODO 4：从字典里取两个值
-    enough = data["enough"]
-    #         防御：如果模型没给出可用的 next_query（None 或空字符串），
-    #              就退回用原问题，别让 state["query"] 变成 None 把下一轮搞崩
-    next_query = data.get("next_query") or question
+        # 归一化：模型可能给布尔 true，也可能给字符串 "true"。
+        # ⚠️ 不能直接 if data.get("enough") —— 字符串 "false" 在 Python 里是【真值】，
+        #    会把"不够"误判成"够了"。所以统一转成小写字符串再比。
+        enough = str(raw_enough).strip().lower() == "true"
+
+    except Exception as e:
+        # 【为什么抓 Exception 而不是 JSONDecodeError】
+        # 这里是系统边界：输入来自大模型，它什么都干得出来，上面的失败模式已知就有三种。
+        # 宽抓是故意的 —— 宁可降级，也不能让整个图崩。
+        # 放心：KeyboardInterrupt（Ctrl+C）继承自 BaseException，不会被这里吞掉。
+        # ⚠️ 但宽抓的铁律是【必须留痕】：把异常类型也打出来。
+        #    否则哪天是你自己笔误（比如 NameError），也会被静默吃掉，然后查三天。
+        print(f"  [judge] [!!!] 解析模型返回失败：{type(e).__name__}: {e}")
+        print(f"  [judge] 模型原始返回：{reply.content!r}")
+
+        # 降级：连"够不够"都问不出来了，直接收工作答
+        # （答案会是"资料里没有提到"，这是诚实的答案，不是错误）
+        # 选 True 不选 False：再跳一轮大概率一路空转到 MAX_HOPS，白等五轮
+        enough = True
+        next_query = question
 
     print(f"  [judge] 第 {state['hops']} 轮 → 够了吗：{enough}｜下轮问：{next_query}")
 
@@ -247,12 +313,12 @@ if __name__ == "__main__":
     print("开始运行")
     result = graph.invoke(
         {
-            "question": q["can't answer"],
-            "query": q["can't answer"],
+            "question": q["multi jump"],
+            "query": q["multi jump"],
             "seen": [],
             "items": [],
             "hops": 0,
-            "tried": [q["can't answer"]],
+            "tried": [],
         }
     )
     # print(f"state = {result}")

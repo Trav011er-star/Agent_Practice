@@ -1,4 +1,6 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    // 钉死本仓库用的解释器 —— paper-Agent/venv 是标准库 venv
+    "python.defaultInterpreterPath": "E:\\Agent_Practice\\paper-Agent\\venv\\Scripts\\python.exe",
+    // 打开终端时自动激活上面这个环境
+    "python.terminal.activateEnvironment": true
 }
