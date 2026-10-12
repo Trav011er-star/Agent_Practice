@@ -67,6 +67,20 @@ class State(TypedDict):
     enough: bool  # 大模型判断是否结束
     answer: str  # 最终检索结果
     tried: list[str]
+    citations: dict  # 论文中的具体出处
+
+
+def make_initial_state(question: str) -> State:
+    """构造图的初始输入。命令行和服务都从这里取，保证一致。"""
+    return {
+        "question": question,
+        "query": question,  # 第一轮的检索词 = 原问题
+        "seen": [],
+        "items": [],
+        "hops": 0,
+        "tried": [],
+        "citations": [],
+    }
 
 
 # ============================================================
@@ -164,11 +178,26 @@ def node_collect(state: State) -> dict:
 
     print(f"  [collect] 第 {n} 轮：撒网 k={k}，新收 {len(fresh)} 条")
 
+    def _source_meta(doc) -> dict:
+        """只算数据，不拼字符串。"""
+        paper = doc.metadata.get("paper", "?")
+        page = doc.metadata.get("page", "?")
+        page = page + 1 if isinstance(page, int) else "?"
+        chunk_id = doc.metadata["chunk_id"]
+        return {
+            "paper": paper,
+            "page": page,
+            "chunk_id": chunk_id,
+        }
+
+    citation = [_source_meta(d) for d in fresh]
+
     return {
         "items": state["items"] + new_texts,  # 用 + 造新 list
         "seen": seen + new_ids,
         "hops": n,
         "tried": state["tried"] + [query],
+        "citations": state["citations"] + citation,
     }
 
     # 多跳:
@@ -311,15 +340,6 @@ if __name__ == "__main__":
     }
 
     print("开始运行")
-    result = graph.invoke(
-        {
-            "question": q["multi jump"],
-            "query": q["multi jump"],
-            "seen": [],
-            "items": [],
-            "hops": 0,
-            "tried": [],
-        }
-    )
+    result = graph.invoke(make_initial_state(q["multi jump"]))
     # print(f"state = {result}")
     print("运行结束")

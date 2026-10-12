@@ -22,6 +22,14 @@ langchain-ollama==1.1.0
 # （provider="deepseek" 走这里；provider="ollama" 走上面的 langchain-ollama）
 langchain-openai==1.7.0
 
+# ---------- Web 服务（把 Agent 包成 HTTP 接口）----------
+# 对外提供 POST /ask，入口是 api.py。
+# 只有跑 api.py 才需要；只跑 agent/graph.py 那个命令行入口不需要。
+# 注：api.py 用 def 而不是 async def 写路由 ——
+#     uvicorn 会自动把同步函数扔进线程池，多个请求能并行处理。
+fastapi==0.143.0
+uvicorn==0.53.0
+
 # ---------- PDF 解析 ----------
 pymupdf==1.28.2
 
