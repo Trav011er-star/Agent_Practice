@@ -58,6 +58,10 @@
     font: 13px ui-monospace, Consolas, monospace;
     background: var(--grey); padding: 1px 5px; border-radius: 4px;
   }
+  /* 打字阶段专用：这时 #answer 里攒的是【纯文本】，还没法渲染 Markdown，
+     所以要 pre-wrap —— 否则多余的空格和换行会全塌掉，文字挤成一坨。
+     final 帧到了就把这个类摘掉，换成渲染好的 HTML，排版交给上面的元素间距。 */
+  #answer.streaming { white-space: pre-wrap; }
 
   #citations { margin: 0; padding-left: 20px; font-size: 13px; color: var(--muted); }
   #citations li { margin-bottom: 2px; }
@@ -89,7 +93,14 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const qEl = $("q"), goEl = $("go"), progEl = $("progress");
+const qEl = $("q"), goEl = $("go"), progEl = $("progress"), ansEl = $("answer");
+
+/* 本次提问是否已经收到 final 帧。
+   ★ 为什么要这个开关：token 是一小片一小片来的，正常情况下 final 之后不该再有。
+     但真要是网络乱序、或者后端多吐了一片，那一句 textContent += 就会把
+     刚渲染好的 HTML【整个冲掉】，页面变成一坨裸文本。
+     所以 final 一到就上锁，之后的 token 一律丢掉。 */
+let finished = false;
 
 /* 往进度区追加一行。
    ★ 用 textContent 而不是 innerHTML —— 内容是从大模型来的，
@@ -191,11 +202,28 @@ function handleFrame(raw) {
     renderCitations(msg.citations);
   } else if (msg.type === "plan") {
     log(`↳ 改写检索词：${msg.next}`, "plan");
+  } else if (msg.type === "token") {
+    /* ★ token 和 citations 正好相反，这俩千万别搞混：
+           citations  每帧发【累计全量】  → 前端整个替换
+           token      每帧发【一小段增量】→ 前端往后追加
+       所以这里是 +=，不是 =。
+       又因为答案还没拼完，没法渲染 Markdown，只能先当【纯文本】攒着 ——
+       用的还是 textContent，所以这一阶段天然不会执行任何标签。 */
+    if (finished) return;                          // 锁上了就不收
+    ansEl.classList.add("streaming");              // 打字阶段：保住换行和空格
+    ansEl.textContent += msg.text;
+    $("answer-box").classList.remove("hidden");    // 第一个字到了就把框露出来
+    window.scrollTo(0, document.body.scrollHeight);
   } else if (msg.type === "final") {
-    // ★ 这里终于要用 innerHTML —— 但塞进去的不是 msg.answer 原文，
-    //   而是 renderMarkdown() 处理过的结果（转义在前、拼标签在后）。
-    //   直接把 msg.answer 丢给 innerHTML 就是 XSS。
-    $("answer").innerHTML = renderMarkdown(msg.answer);
+    /* ★ final 是【权威版本】，token 阶段只是"先看着"。
+       token 攒的是纯文本，这里换成渲染好的 HTML —— Markdown 格式终于显示出来。
+       所以哪怕某几片 token 丢了、或被上面的锁丢掉了，这一步都会把答案
+       【整个修正回来】。SSE 没有重传，这种"最后一帧定稿"就是自愈手段。
+       innerHTML 塞的不是 msg.answer 原文，而是 renderMarkdown() 的结果
+       （转义在前、拼标签在后）。直接塞原文就是 XSS。 */
+    finished = true;                               // 上锁，挡掉迟到的 token
+    ansEl.classList.remove("streaming");           // 换回 HTML 排版
+    ansEl.innerHTML = renderMarkdown(msg.answer);
     $("answer-box").classList.remove("hidden");
     log(`✔ 完成（共 ${msg.hops} 轮）`, "ok");
   } else if (msg.type === "error") {
@@ -205,6 +233,9 @@ function handleFrame(raw) {
 
 async function ask(question) {
   progEl.textContent = "";
+  ansEl.textContent = "";        // ★ 必须清空：token 是往后【追加】的，
+                                 //   不清空的话上一题的答案会留在这题开头
+  finished = false;              // ★ 解锁。忘了这行的话第二问一个 token 都收不到
   $("answer-box").classList.add("hidden");
   $("cite-box").classList.add("hidden");
   goEl.disabled = qEl.disabled = true;

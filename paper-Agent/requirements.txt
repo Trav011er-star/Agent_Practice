@@ -30,6 +30,23 @@ langchain-openai==1.7.0
 fastapi==0.143.0
 uvicorn==0.53.0
 
+# ---------- 可观测性（把每次提问的完整轨迹上报 Langfuse）----------
+# 接线在 api.py：CallbackHandler 挂进 graph.stream 的 config["callbacks"]。
+# 只有跑 api.py 才需要；只跑 agent/graph.py 那个命令行入口不需要。
+#
+# ⚠️ 密钥从 .env 读（LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY），
+#    缺密钥不会报错 —— SDK 打印一句 "Client will be disabled" 就自己关掉，
+#    服务照常运行，只是不上报。所以别人没配也能跑起来。
+langfuse==4.18.0
+
+# ⚠️⚠️ 下面这行【必须显式钉住】，别以为它是多余的 ——
+#     langfuse 依赖 opentelemetry-*-proto-common 1.45.1，
+#     而 chromadb 依赖 opentelemetry-exporter-otlp-proto-grpc。
+#     若 grpc exporter 停在 1.44.0，两边的内部模块对不上，
+#     chromadb 直接 ImportError → 整个向量检索挂掉、服务起不来。
+#     实测踩过一次（2026-10-14），所以这里把版本钉死。
+opentelemetry-exporter-otlp-proto-grpc==1.45.1
+
 # ---------- PDF 解析 ----------
 pymupdf==1.28.2
 

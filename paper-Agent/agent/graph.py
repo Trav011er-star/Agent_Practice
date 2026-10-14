@@ -300,6 +300,7 @@ def node_done(state: State) -> dict:
     question = state["question"]
     evidence = "\n\n".join(state["items"])  # 多条证据用空行拼成一整段
     prompt = PROMPT_DONE.format(question=question, evidence=evidence)
+    # 带阻塞
     answer = _llm_text.invoke(prompt).content
     print(f"检索结果: {answer}")
     return {"answer": answer}

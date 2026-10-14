@@ -90,6 +90,27 @@ from engine import get_engine  # noqa: E402
 #     因为我们故意要先执行 sys.path.insert。用 noqa 让它闭嘴。
 
 
+# ------------------------------------------------------------
+# 可观测性：把每次提问的完整轨迹上报 Langfuse
+# ------------------------------------------------------------
+# ⚠️ 为什么这两行必须放在【graph import 之后】，不能挪到文件顶部的 import 区：
+#    密钥是从 .env 读的，而 .env 是被 config.py 里的 load_dotenv 灌进环境变量的
+#    —— config 又是被 graph 间接 import 的。
+#    放在 graph 之前，load_dotenv 还没执行，Langfuse 读到空密钥，
+#    然后打印一句 "Client will be disabled" 就【静默关掉】，一条 trace 都不报。
+#    这是个不报错的坑：服务照常跑，你只是永远看不到数据。
+from langfuse import Langfuse  # noqa: E402
+from langfuse.langchain import CallbackHandler  # noqa: E402
+
+langfuse_client = Langfuse()  # 读 LANGFUSE_* 环境变量建客户端
+langfuse_handler = CallbackHandler()  # 挂到 graph.stream 的 config["callbacks"] 上
+#
+# 缺密钥不会报错：SDK 自己"禁用"，服务照常起、照常干活，只是不上报。
+# 上报也是【后台线程批量发】的 —— 发失败只打一行日志、丢掉这一批，
+# 既不重试也不阻塞请求。所以 Langfuse 挂了/没额度，你的服务毫发无伤。
+# 想彻底关掉：.env 里加 LANGFUSE_TRACING_ENABLED=false
+
+
 # ============================================================
 # 第 2 件事：lifespan —— 服务的"开门前备菜"
 # ============================================================
@@ -134,8 +155,12 @@ async def lifespan(app: FastAPI):
     yield  # ← 【分界线】上面是启动，下面是关闭
 
     # ===== 关闭时（yield 之后）=====
-    #   本项目没有需要清理的资源，留个打印当"这条路是活的"的证据。
-    #   （真要连数据库/线程池，就在这儿关掉。）
+    #   引擎没有需要清理的资源，所以这里主要做一件事：
+    #   把 Langfuse 缓冲里还没发出去的 trace 冲干净。
+    #   （SDK 是【批量】上报的：攒够一批、或者等超时了才发。服务被 Ctrl+C
+    #     掐掉时缓冲里可能还压着最后几条，不 flush 就丢了。）
+    #   顺序上先冲、再打印 —— 让"服务要关了"这句话意味着"该收拾的都收拾完了"。
+    langfuse_client.flush()
     print("服务要关了")
 
 
@@ -289,48 +314,83 @@ def ask_stream(req: AskRequest):
     def event_gen():
         hops = 0
         try:
-            # 每走完一个节点 node 就停下来，把这一小步交给你，然后接着走
-            # 每跑完一个节点，就执行一次循环
-            # 图走到 END，就不再吐了。循环自动停
-            # 图停着不动 ──► 你伸手要一次 ──► 它往前跑【一个节点】──► 停下 ──► 交给你
-            for chunk in graph.stream(
+            # ── 同时要【两种】流，所以 stream_mode 传一个【列表】──
+            # 传列表时，每次 yield 出来的是两个东西：(mode, data)
+            #     "updates"  → 节点级：每跑完一个节点一帧   —— 用来报进度
+            #     "messages" → token 级：LLM 每吐一小段字一帧 —— 用来吐答案
+            #
+            # ⚠️ 这里【没有】改 graph.py 一行。LangGraph 的 "messages" 模式会挂一个
+            #    流式回调，node_done 里那句【阻塞的】_llm_text.invoke(...) 检测到
+            #    回调后会自动改走流式接口。
+            #    依据：langchain_core 的 BaseChatModel._should_stream，最后一行就是
+            #    "有流式回调挂上 → 返回 True"。已实测（judge 17 块 / done 44 块）。
+
+            # ┌─────────┬─────────────┬───────────────────────────┬─────────────────────────────┐
+            # │  节点   │  调 LLM 吗   │ updates 帧（节点的return） │ messages 帧（ LLM 吐的token）│
+            # ├─────────┼─────────────┼───────────────────────────┼─────────────────────────────┤
+            # │ collect │ 否          │ progress                  │ 0 片（没 LLM 可吐）          │
+            # ├─────────┼─────────────┼───────────────────────────┼─────────────────────────────┤
+            # │ judge   │ 是          │ plan                      │ 44 片 ← 被 continue 丢掉     │
+            # │         │ _llm_json   │                           │                             │
+            # ├─────────┼─────────────┼───────────────────────────┼─────────────────────────────┤
+            # │ done    │ 是          │ final ← 它的返回在这！      │ 451 片 ← 保留成 token       │
+            # │         │ _llm_text   │                           │                             │
+            # └─────────┴─────────────┴───────────────────────────┴─────────────────────────────┘
+
+            # 每个节点跑完都往 updates 发一帧（它的返回值）
+            # 调了 LLM 的节点额外往 messages 发一堆 token
+            # 我们只把 done 的 token 放行，因为只有它的 token 是给人看的句子
+
+            for mode, data in graph.stream(
                 make_initial_state(req.question),
-                # "updates" = 只给这个节点刚挪动的那部分
-                # "values" = 每步把完整 state全给你
-                stream_mode="updates",
+                config={"callbacks": [langfuse_handler]},
+                stream_mode=["updates", "messages"],
             ):
-                # chunk 是 {"节点名": {那一节点return的东西}}
-                #   按名字分三种，用 _sse(...) 包好 yield 出去：
-                #     "collect" → {"type":"progress","round":hops,"hits":len(citations)}
-                #     "judge"   → {"type":"plan","next":query}
-                #     "done"    → {"type":"final","answer":answer,"hops":hops}
-                #   （hops 在循环外记着，因为 done 那帧自己不带轮数）
-                for node, update in chunk.items():
-                    # 每次返回的内容格式： {  节点名字  :  这个节点 return 的那个 dict  }
-                    # chunk.items() 把它拆成 node 和 update
-                    # node = "collect" / "judge" / "done"
-                    # update = 这个节点 return 的那个 dict（节点 return 出来的 dict 本身）
-                    if node == "collect":
-                        hops = update["hops"]
-                        yield _sse(
-                            {
-                                "type": "progress",
-                                "round": hops,
-                                "hits": len(update["citations"]),
-                                "citations": update["citations"],
-                            }
-                        )
-                    elif node == "judge":
-                        if not update["enough"]:
-                            yield _sse({"type": "plan", "next": update["query"]})
-                    elif node == "done":
-                        yield _sse(
-                            {
-                                "type": "final",
-                                "answer": update["answer"],
-                                "hops": hops,
-                            }
-                        )
+                # ══════════ 一、节点级：进度 ══════════
+                if mode == "updates":
+                    # data 是 {"节点名": {那一节点 return 的东西}}
+                    # node   = "collect" / "judge" / "done"
+                    # update = 那个节点 return 出来的 dict 本身
+                    for node, update in data.items():
+                        if node == "collect":
+                            hops = update["hops"]  # 记进记事本，final 要用
+                            yield _sse(
+                                {
+                                    "type": "progress",
+                                    "round": hops,
+                                    "hits": len(update["citations"]),
+                                    # citations 是【到目前攒的所有】（3 → 9 → 18），
+                                    # 前端要【整个替换】，不能追加（否则 3+9+18 = 30 条重复）
+                                    "citations": update["citations"],
+                                }
+                            )
+                        elif node == "judge":
+                            # enough=True 时 query 退回【原问题】，那是占位符不是计划。
+                            # 发了前端就会显示一条假的"下一步"。
+                            if not update["enough"]:
+                                yield _sse({"type": "plan", "next": update["query"]})
+                        elif node == "done":
+                            yield _sse(
+                                {
+                                    "type": "final",
+                                    "answer": update["answer"],
+                                    # done 那帧不带轮数，用 collect 时记的
+                                    "hops": hops,
+                                }
+                            )
+
+                # ══════════ 二、token 级：答案一个字一个字吐 ══════════
+                # data 是 (一小段消息, 元信息)，元信息里有 langgraph_node，
+                # 说明这段字是【哪个节点】产生的。
+                elif mode == "messages":
+                    piece, meta = data
+                    # ⚠️ judge 也在调 LLM，它的 JSON 也会被拆成 token 吐出来。
+                    #    只留 done 的，否则答案里会混进 {"enough": true} 这种碎片。
+                    if meta.get("langgraph_node") != "done":
+                        continue
+                    text = piece.content
+                    if text:  # 有些块是空的（比如整个回复的第一块）
+                        yield _sse({"type": "token", "text": text})
         except Exception as e:
             print(f"[api] /ask/stream 中途出错：{type(e).__name__}: {e}")
             traceback.print_exc()
