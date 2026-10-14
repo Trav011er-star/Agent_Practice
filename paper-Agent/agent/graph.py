@@ -67,7 +67,8 @@ class State(TypedDict):
     enough: bool  # 大模型判断是否结束
     answer: str  # 最终检索结果
     tried: list[str]
-    citations: dict  # 论文中的具体出处
+    citations: list[dict]  # 论文中的具体出处
+    weak_rounds: int
 
 
 def make_initial_state(question: str) -> State:
@@ -80,6 +81,7 @@ def make_initial_state(question: str) -> State:
         "hops": 0,
         "tried": [],
         "citations": [],
+        "weak_rounds": 0,
     }
 
 
@@ -88,6 +90,11 @@ def make_initial_state(question: str) -> State:
 # ============================================================
 # 最大跳转轮次
 MAX_HOPS = 5
+
+# 最大无有效检索轮次
+MAX_WEAK_ROUNDS = 2
+# 判定为无效检索的得分阈值
+MIN_RERANK_SCORE = 0.0  # 阈值
 
 # 规定返回的格式的 json
 print("[LLM] 调用 JSON 格式大模型")
@@ -164,20 +171,6 @@ def node_collect(state: State) -> dict:
     #         每个元素 doc 的 id 在 doc.metadata["chunk_id"]
     fresh = [d for d in docs if d.metadata["chunk_id"] not in seen]
 
-    def _source_label(doc) -> str:
-        """给一条证据生成出处标签，例如 [Attention Is All You Need, p.7]"""
-        paper = doc.metadata.get("paper", "?")  # 建库时已经写好了论文名
-        page = doc.metadata.get("page", "?")
-        # page 是 0 起算的（PyMuPDF 的规定），显示时 +1 才对得上人翻的页码
-        page = page + 1 if isinstance(page, int) else "?"
-        return f"[{paper}, p.{page}]"
-
-    new_texts = [f"{_source_label(d)} {d.page_content}" for d in fresh]
-
-    new_ids = [d.metadata["chunk_id"] for d in fresh]
-
-    print(f"  [collect] 第 {n} 轮：撒网 k={k}，新收 {len(fresh)} 条")
-
     def _source_meta(doc) -> dict:
         """只算数据，不拼字符串。"""
         paper = doc.metadata.get("paper", "?")
@@ -191,6 +184,27 @@ def node_collect(state: State) -> dict:
         }
 
     citation = [_source_meta(d) for d in fresh]
+    new_texts = [
+        f"[{m['paper']}, p.{m['page']}] {d.page_content}"
+        for d, m in zip(fresh, citation)
+    ]
+
+    new_ids = [d.metadata["chunk_id"] for d in fresh]
+
+    if len(fresh) == 0:
+        top_score = None
+        weak_rounds = state["weak_rounds"] + 1
+    else:
+        top_score = fresh[0].metadata.get("rerank_score")
+        weak_rounds = state["weak_rounds"] + 1 if top_score < MIN_RERANK_SCORE else 0
+
+    # 危险的算法关在 if 里
+    top_display = "—" if top_score is None else f"{top_score:.2f}"
+
+    # 这一行只负责把现成的字符串拼起来，不可能失败
+    print(
+        f"  [collect] 第 {n} 轮：撒网 k={k}，新收 {len(fresh)} 条，最高分 {top_display}"
+    )
 
     return {
         "items": state["items"] + new_texts,  # 用 + 造新 list
@@ -198,6 +212,7 @@ def node_collect(state: State) -> dict:
         "hops": n,
         "tried": state["tried"] + [query],
         "citations": state["citations"] + citation,
+        "weak_rounds": weak_rounds,
     }
 
     # 多跳:
@@ -271,8 +286,16 @@ def node_judge(state: State) -> dict:
 def node_done(state: State) -> dict:
     if state["enough"]:
         print("  [done] judge 认为证据够了，开始作答")
-    else:
+    elif state["weak_rounds"] >= MAX_WEAK_ROUNDS:
+        print(f"  [done] 超过 {MAX_WEAK_ROUNDS} 轮未有新的有效证据，直接写答案")
+    elif state["hops"] >= MAX_HOPS:
         print(f"  [done] 跳满 {MAX_HOPS} 轮证据仍不足，如实作答")
+    else:
+        print(
+            f"  [done] [!!!] 未预期地走到 done："
+            f"enough={state['enough']} hops={state['hops']} "
+            f"weak_rounds={state['weak_rounds']}"
+        )
 
     question = state["question"]
     evidence = "\n\n".join(state["items"])  # 多条证据用空行拼成一整段
@@ -289,7 +312,11 @@ def node_done(state: State) -> dict:
 # 这个函数**不改数据**。
 def route_after_judge(state: State) -> str:
     # 根据目前检索的条目数量和轮次决定是否继续或停止
-    if state["enough"] or state["hops"] >= MAX_HOPS:
+    if (
+        state["enough"]
+        or state["hops"] >= MAX_HOPS
+        or state["weak_rounds"] >= MAX_WEAK_ROUNDS
+    ):
         return "go_done"
     return "go_again"
 

@@ -199,17 +199,14 @@ class HybridRetriever:
     def dense_search(self, query, k):
         """纯向量检索，返回 [(chunk_id, 相似度分数), ...]"""
         results = self.vector_store.similarity_search_with_score(query, k=k)
-        return [
-            (doc.metadata["chunk_id"], score) for doc, score in results
-        ]
+        return [(doc.metadata["chunk_id"], score) for doc, score in results]
 
     def bm25_search(self, query, k):
         """BM25 关键词检索，返回 [(chunk_id, 分数), ...]"""
         return self.bm25.search(query, k=k)
 
     # -- 对外接口 ----------------------------------------------------------
-    def search(self, query, k, mode="hybrid", reranker=None,
-               candidate_k=None):
+    def search(self, query, k, mode="hybrid", reranker=None, candidate_k=None):
         """
         mode:
           "dense"         纯向量
@@ -222,7 +219,9 @@ class HybridRetriever:
 
         if mode == "dense":
             ranked = self.dense_search(query, k=k)
-            return [self.doc_by_id[cid] for cid, _ in ranked[:k] if cid in self.doc_by_id]
+            return [
+                self.doc_by_id[cid] for cid, _ in ranked[:k] if cid in self.doc_by_id
+            ]
 
         # ---- 取两路候选 ----
         dense_hits = self.dense_search(query, k=candidate_k)
@@ -234,13 +233,18 @@ class HybridRetriever:
         )
 
         if mode == "hybrid":
-            return [self.doc_by_id[cid] for cid, _ in fused[:k] if cid in self.doc_by_id]
+            return [
+                self.doc_by_id[cid] for cid, _ in fused[:k] if cid in self.doc_by_id
+            ]
 
         if mode == "hybrid_rerank":
             if reranker is None:
                 raise ValueError("mode='hybrid_rerank' 需要传入 reranker 实例")
-            candidates = [self.doc_by_id[cid] for cid, _ in fused[:candidate_k]
-                          if cid in self.doc_by_id]
+            candidates = [
+                self.doc_by_id[cid]
+                for cid, _ in fused[:candidate_k]
+                if cid in self.doc_by_id
+            ]
             return reranker.rerank(query, candidates, top_n=k)
 
         raise ValueError(f"未知的检索模式: {mode!r}")
@@ -284,7 +288,22 @@ class Reranker:
             return []
 
         pairs = [(query, doc.page_content) for doc in documents]
+        # 每一个片段和当前的 query 相关度打分
         scores = self.model.predict(pairs)
 
-        ranked = sorted(zip(documents, scores), key=lambda x: -float(x[1]))
-        return [doc for doc, _ in ranked[:top_n]]
+        # documents 是文档列表，scores 是分数列表
+        # 两个列表下标一一对应：第 i 个分数就是第 i 篇文档的分数。
+        # x[1]用 (documents, scores) 元组中的 scores 排序
+        ranked = sorted(
+            zip(documents, scores),
+            key=lambda x: float(x[1]),
+            reverse=True,
+        )
+        # ranked = [(doc_A, 9.71), (doc_C, 6.32), (doc_B, -7.70)]
+
+        docs = []
+        for doc, score in ranked[:top_n]:
+            doc.metadata["rerank_score"] = float(score)
+            docs.append(doc)
+
+        return docs
