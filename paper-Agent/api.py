@@ -46,8 +46,9 @@ from pydantic import BaseModel  # "请求体长什么样"的声明工具
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager  # 用来写 lifespan（第 2 件事讲）
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 import traceback
+import json
 
 # ------------------------------------------------------------
 # 手动把 agent/ 目录插到搜索路径最前面
@@ -205,10 +206,14 @@ def query(req: AskRequest):  # 对内，外部的 POST 请求 /ask 可以和函�
     #       node_collect 读 hops / query / seen / items / tried / citations
     #   少给一个就是 KeyError。
     #
-    #   （State 里一共 9 个字段，但有 2 个不用给：
+    #   （State 里一共 10 个字段，但有 2 个不用给：
     #       enough —— judge 会写它，写完了才有人读
     #       answer —— done 写了就结束了，没人读
-    #     所以正好 7 个。这也是为什么 make_initial_state 里是 7 个键。）
+    #     所以正好 8 个。这也是为什么 make_initial_state 里是 8 个键。）
+    #
+    #   ⚠️ 这两个数字是 10-13 加的 weak_rounds 改的。
+    #      原来写的是 9 / 7 —— 加字段时忘了改注释。
+    #      所以改 State 的时候记得回来看一眼这儿。
     result = graph.invoke(make_initial_state(question))
 
     # --------------------------------------------------------
@@ -261,3 +266,80 @@ async def handle_exception(request, exc):
     #    ⚠️ 返回值必须是 Response 对象，不能是 dict
     #       （Starlette 会拿返回值当 Response 调用 → 'dict' object is not callable）
     return JSONResponse(status_code=500, content={"error": "服务内部错误，请稍后重试"})
+
+
+def _sse(payload: dict) -> str:
+    """把一个 dict 打包成一帧 SSE 文本。
+
+    纯搬运工，不含任何逻辑。抽出来唯一的原因是：
+    下面要 yield 好几处，每处都手写 "data: " + json.dumps(...) + "\n\n"，
+    迟早会漏那个换行 —— 而漏换行是最难查的一类错。
+    """
+    # 三块拼起来：
+    #   ① "data: "  —— 固定开头。⚠️ 冒号后面【有一个空格】，别丢
+    #   ② json.dumps(..., ensure_ascii=False)
+    #        ensure_ascii 默认是 True，会把中文转成 \u4f60\u597d 这种转义。
+    #        能用，但调试时看不懂。设 False 就保留原样中文。
+    #   ③ "\n\n"    —— 两个换行 = 这条消息结束
+    return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
+
+
+@app.post("/ask/stream")
+def ask_stream(req: AskRequest):
+    def event_gen():
+        hops = 0
+        try:
+            # 每走完一个节点 node 就停下来，把这一小步交给你，然后接着走
+            # 每跑完一个节点，就执行一次循环
+            # 图走到 END，就不再吐了。循环自动停
+            # 图停着不动 ──► 你伸手要一次 ──► 它往前跑【一个节点】──► 停下 ──► 交给你
+            for chunk in graph.stream(
+                make_initial_state(req.question),
+                # "updates" = 只给这个节点刚挪动的那部分
+                # "values" = 每步把完整 state全给你
+                stream_mode="updates",
+            ):
+                # chunk 是 {"节点名": {那一节点return的东西}}
+                #   按名字分三种，用 _sse(...) 包好 yield 出去：
+                #     "collect" → {"type":"progress","round":hops,"hits":len(citations)}
+                #     "judge"   → {"type":"plan","next":query}
+                #     "done"    → {"type":"final","answer":answer,"hops":hops}
+                #   （hops 在循环外记着，因为 done 那帧自己不带轮数）
+                for node, update in chunk.items():
+                    # 每次返回的内容格式： {  节点名字  :  这个节点 return 的那个 dict  }
+                    # chunk.items() 把它拆成 node 和 update
+                    # node = "collect" / "judge" / "done"
+                    # update = 这个节点 return 的那个 dict（节点 return 出来的 dict 本身）
+                    if node == "collect":
+                        hops = update["hops"]
+                        yield _sse(
+                            {
+                                "type": "progress",
+                                "round": hops,
+                                "hits": len(update["citations"]),
+                                "citations": update["citations"],
+                            }
+                        )
+                    elif node == "judge":
+                        if not update["enough"]:
+                            yield _sse({"type": "plan", "next": update["query"]})
+                    elif node == "done":
+                        yield _sse(
+                            {
+                                "type": "final",
+                                "answer": update["answer"],
+                                "hops": hops,
+                            }
+                        )
+        except Exception as e:
+            print(f"[api] /ask/stream 中途出错：{type(e).__name__}: {e}")
+            traceback.print_exc()
+            yield _sse({"type": "error", "message": "服务内部错误，请稍后重试"})
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+@app.get("/")
+def index():
+    """把前端页面挂到根路径：浏览器打开 http://127.0.0.1:8000 就是它。"""
+    return FileResponse(Path(__file__).resolve().parent / "static" / "index.html")

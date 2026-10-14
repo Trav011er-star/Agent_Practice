@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>论文问答 Agent</title>
+<style>
+  :root {
+    --fg:#1f2328; --muted:#656d76; --line:#d0d7de; --grey:#f6f8fa;
+    --blue:#0969da; --red:#cf222e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font: 15px/1.65 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    color: var(--fg); background: #fff; max-width: 780px;
+    margin: 0 auto; padding: 36px 20px 72px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 26px; }
+
+  .row { display: flex; gap: 8px; }
+  input {
+    flex: 1; padding: 9px 12px; font: inherit;
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  input:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  input:disabled { background: var(--grey); }
+  button {
+    padding: 9px 20px; font: inherit; font-weight: 600; color: #fff;
+    background: var(--blue); border: 0; border-radius: 6px; cursor: pointer;
+  }
+  button:disabled { background: var(--muted); cursor: default; }
+
+  section { margin-top: 26px; }
+  h2 {
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .05em; margin: 0 0 8px;
+  }
+
+  /* 进度区：等宽字体，一行一行往下滚 */
+  #progress {
+    margin-top: 18px; padding: 12px 14px;
+    font: 13px/1.75 ui-monospace, Consolas, "Courier New", monospace;
+    background: var(--grey); border: 1px solid var(--line); border-radius: 6px;
+  }
+  #progress:empty { display: none; }
+  #progress .round { color: var(--fg); }
+  #progress .plan  { color: var(--blue); padding-left: 14px; }
+  #progress .err   { color: var(--red); }
+  #progress .ok    { color: var(--muted); }
+
+  /* 答案会被渲染成 HTML（<p> / <ul>），所以不用 pre-wrap，靠元素自己的间距 */
+  #answer p    { margin: 0 0 10px; }
+  #answer ul   { margin: 0 0 10px; padding-left: 22px; }
+  #answer li   { margin-bottom: 4px; }
+  #answer h3   { font-size: 15px; margin: 16px 0 6px; }
+  #answer code {
+    font: 13px ui-monospace, Consolas, monospace;
+    background: var(--grey); padding: 1px 5px; border-radius: 4px;
+  }
+
+  #citations { margin: 0; padding-left: 20px; font-size: 13px; color: var(--muted); }
+  #citations li { margin-bottom: 2px; }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+  <h1>论文问答 Agent</h1>
+  <div class="sub">多跳检索 · 混合检索 + 重排 · 边跑边报进度</div>
+
+  <div class="row">
+    <input id="q" placeholder="比如：BERT 和 GPT-3 的预训练目标有什么不同？">
+    <button id="go">提问</button>
+  </div>
+
+  <div id="progress"></div>
+
+  <section id="answer-box" class="hidden">
+    <h2>答案</h2>
+    <div id="answer"></div>
+  </section>
+
+  <section id="cite-box" class="hidden">
+    <h2>引用来源</h2>
+    <ul id="citations"></ul>
+  </section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const qEl = $("q"), goEl = $("go"), progEl = $("progress");
+
+/* 往进度区追加一行。
+   ★ 用 textContent 而不是 innerHTML —— 内容是从大模型来的，
+     用 innerHTML 等于让模型写的 HTML 在页面里执行（XSS）。
+     textContent 只当纯文本，标签原样显示，安全。 */
+function log(text, cls) {
+  const line = document.createElement("div");
+  line.className = cls || "round";
+  line.textContent = text;
+  progEl.appendChild(line);
+  window.scrollTo(0, document.body.scrollHeight);   // 自动跟到最新一行
+}
+
+/* 把 source 列表画出来。
+   ★ 后端每帧发的是【累计】列表（3 → 9 → 18），
+     所以这里是【整个替换】，不是往后追加。
+     真追加的话会变成 3+9+18 = 30 条重复。 */
+function renderCitations(list) {
+  if (!list || !list.length) return;
+  const ul = $("citations");
+  ul.textContent = "";                 // 清空 → 重画
+  const seen = new Set();              // 同一页可能命中多个片段，去重用
+  for (const c of list) {
+    const key = c.paper + " p." + c.page;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const li = document.createElement("li");
+    li.textContent = c.paper + ", p." + c.page;
+    ul.appendChild(li);
+  }
+  $("cite-box").classList.remove("hidden");
+}
+
+/* ——— 迷你 Markdown 渲染 ———
+   只认大模型实际会用的那几种：加粗、行内代码、无序列表、空行分段。
+   不是通用 Markdown 解析器（表格 / 链接 / 嵌套列表都不管）。
+
+   ★★ 最关键的是【顺序】：先转义，再套标记 ★★
+      第 ① 步做完，模型文本里的 < > & 已经变成实体字面量，
+      后面无论怎么拼标签，都不可能被"模型写的东西"执行。
+      反过来（先套标记后转义）会把自己生成的 <strong> 也转掉，页面变一堆字面标签。
+   即便将来换成正经解析器（marked + DOMPurify），"先转义/再消毒"这条也不能省。 */
+function inlineMd(s) {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")   // **加粗**
+    .replace(/`([^`]+)`/g, "<code>$1</code>");          // `行内代码`
+}
+
+function renderMarkdown(text) {
+  // ① 转义 —— 这一步是整个函数的安全底线，别删
+  const esc = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  const out = [];
+  let inList = false;                       // 记住"我正处在列表里"，好知道什么时候补齐 </ul>
+
+  for (const rawLine of esc.split("\n")) {
+    const line = rawLine.trimEnd();
+
+    const bullet = line.match(/^\s*[-*]\s+(.*)$/);        // "- xxx"
+    const head   = line.match(/^\s*#{1,4}\s+(.*)$/);      // "### xxx"
+
+    if (bullet) {
+      if (!inList) { out.push("<ul>"); inList = true; }
+      out.push("<li>" + inlineMd(bullet[1]) + "</li>");
+    } else {
+      if (inList) { out.push("</ul>"); inList = false; }   // 列表结束，补上收尾标签
+      if (head) {
+        out.push("<h3>" + inlineMd(head[1]) + "</h3>");
+      } else if (line.trim()) {
+        out.push("<p>" + inlineMd(line) + "</p>");
+      }
+      // 空行 → 什么都不输出，段落间距交给 CSS 的 margin
+    }
+  }
+  if (inList) out.push("</ul>");            // 文件结尾正好在列表里，也得补
+
+  return out.join("");
+}
+
+/* 处理一帧 SSE。
+   传进来的是去掉结尾空行的一段文本，长这样：
+       data: {"type":"progress","round":1,"hits":3}      */
+function handleFrame(raw) {
+  const line = raw.trim();
+  if (!line.startsWith("data:")) return;      // 不是数据行，忽略
+
+  let msg;
+  try {
+    msg = JSON.parse(line.slice(5).trim());   // 砍掉 "data:" 再解析
+  } catch (e) {
+    return;                                   // 解不开就跳过，不让整页崩
+  }
+
+  if (msg.type === "progress") {
+    log(`第 ${msg.round} 轮 · 累计 ${msg.hits} 条证据`);
+    renderCitations(msg.citations);
+  } else if (msg.type === "plan") {
+    log(`↳ 改写检索词：${msg.next}`, "plan");
+  } else if (msg.type === "final") {
+    // ★ 这里终于要用 innerHTML —— 但塞进去的不是 msg.answer 原文，
+    //   而是 renderMarkdown() 处理过的结果（转义在前、拼标签在后）。
+    //   直接把 msg.answer 丢给 innerHTML 就是 XSS。
+    $("answer").innerHTML = renderMarkdown(msg.answer);
+    $("answer-box").classList.remove("hidden");
+    log(`✔ 完成（共 ${msg.hops} 轮）`, "ok");
+  } else if (msg.type === "error") {
+    log("✗ " + msg.message, "err");
+  }
+}
+
+async function ask(question) {
+  progEl.textContent = "";
+  $("answer-box").classList.add("hidden");
+  $("cite-box").classList.add("hidden");
+  goEl.disabled = qEl.disabled = true;
+
+  try {
+    /* ★ 为什么不用浏览器的 EventSource？
+         EventSource 只会发 GET，而且【不能带请求体】。
+         我们的接口是 POST + JSON body，它办不到。
+         所以用 fetch 拿到流，自己一帧一帧解。            */
+    const resp = await fetch("/ask/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: question }),
+    });
+
+    if (!resp.ok) {
+      log(`✗ 服务返回 ${resp.status}（请求被拒绝，看 uvicorn 日志）`, "err");
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buf = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      /* ★ stream:true —— 网络是按"块"送的，
+         一个汉字可能正好被切成两半（前一半在这块，后一半在下块）。
+         加了 stream:true，解码器会把半截字攒着，等下半截来了再一起解。
+         不加的话中文会偶尔冒出乱码。                          */
+      buf += decoder.decode(value, { stream: true });
+      buf = buf.replace(/\r\n/g, "\n");     // 保险：万一换行是 \r\n
+
+      /* ★ 按【空行】切帧 —— 这就是 SSE 的规矩：
+           一帧 = data: xxx 后面跟两个换行。
+         用 while 是因为一次 read 可能带回好几帧。            */
+      let i;
+      while ((i = buf.indexOf("\n\n")) !== -1) {
+        const frame = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        handleFrame(frame);
+      }
+    }
+
+    /* 正常结束时 buf 应该是空的。
+       如果还有剩的，说明最后一帧少了结尾的空行 —— 后端 _sse 少写了一个 \n。 */
+    if (buf.trim()) log("⚠ 有半帧没解出来，检查后端 _sse 的换行", "err");
+
+  } catch (e) {
+    log("✗ " + e.message, "err");
+  } finally {
+    goEl.disabled = qEl.disabled = false;
+  }
+}
+
+goEl.addEventListener("click", () => {
+  const q = qEl.value.trim();
+  if (q) ask(q);
+});
+qEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") goEl.click();     // 回车直接提问
+});
+</script>
+</body>
+</html>
