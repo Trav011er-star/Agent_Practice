@@ -28,8 +28,8 @@
 
 import argparse
 import sys
-from pathlib import Path
 import config
+from src.chunking import assign_chunk_ids
 from src.embedding import count_chunks, create_vector_store, delete_collection
 from src.health import OllamaNotReady, ensure_for
 from src.loader import load_pdf
@@ -44,7 +44,9 @@ def collect_pdf_paths(corpus):
     # TODO 1: if/else，两行
     if corpus == "single":
         return [config.DEFAULT_PDF]
-    return sorted(config.DATA_DIR.glob("*.pdf"))
+    return sorted(config.DATA_DIR.glob("*.pdf")) + sorted(
+        config.DOWNLOADED_DIR.glob("*.pdf")
+    )
 
 
 def ingest_one(chunk_size, rebuild=False, corpus="multi"):
@@ -64,12 +66,10 @@ def ingest_one(chunk_size, rebuild=False, corpus="multi"):
     # 给每个片段一个稳定唯一的 chunk_id。
     # 混合检索要把"向量检索"和"BM25"两路结果对齐，必须有一个共同主键；
     # 只靠文本内容比对是不可靠的（不同段落可能有相同文字）。
-    for i, chunk in enumerate(chunks):
-        paper_name = Path(
-            chunk.metadata.get("source", "?")
-        ).stem  # 去掉路径和 .pdf (只要主干 stem)
-        chunk.metadata["chunk_id"] = f"c{chunk_size}_{i:04d}"
-        chunk.metadata["paper"] = f"{paper_name}"
+    #
+    # 编号方案本身在 src/chunking.py —— ingest.py（全量建库）和
+    # download_paper（增量入库）必须共用同一份实现，否则两边会算出不同的 id。
+    assign_chunk_ids(chunks, chunk_size)
 
     if rebuild:
         delete_collection(collection_name)

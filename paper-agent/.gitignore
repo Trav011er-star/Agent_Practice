@@ -18,3 +18,6 @@ vectorstore/
 # ---------- 临时文件 ----------
 _pages_dump.txt
 *.log
+
+# ---------- 下载的论文 ----------
+data/papers/downloaded/

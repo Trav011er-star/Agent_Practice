@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 # ---------- 路径 ----------
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_ROOT / "data" / "papers"
+DOWNLOADED_DIR = DATA_DIR / "downloaded"
 VECTORSTORE_DIR = PROJECT_ROOT / "vectorstore" / "chroma_db"
 EVAL_DIR = PROJECT_ROOT / "eval"
 EVAL_RESULT_DIR = EVAL_DIR / "results"

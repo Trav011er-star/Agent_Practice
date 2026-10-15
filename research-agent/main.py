@@ -14,7 +14,8 @@ llm = ChatOpenAI(
     temperature=0,  # 判断类任务不要抖
 )
 
-SYSTEM_PROMPT = """你是一个论文问答助手，手上有一个本地论文库检索工具 query_corpus。
+SYSTEM_PROMPT = """你是一个论文问答助手，手上有本地论文库和三个工具：
+query_corpus（查本地论文库）、search_arxiv（查 arXiv）、download_paper（把 arXiv 论文下载并入库）。
 
 回答规则：
 1. 涉及论文内容的问题，必须先用 query_corpus 检索原文，不许凭记忆作答。
@@ -27,6 +28,11 @@ SYSTEM_PROMPT = """你是一个论文问答助手，手上有一个本地论文�
 3. 如果 query_corpus 返回的片段不足以支撑回答，先试试 search_arxiv 去外部找；
     两边都找不到时才说「没有找到相关内容」，不要硬凑。
 4. 允许补充你自己的通用知识，但必须明确标注「（通用知识，非论文原文）」。
+5. download_paper 会把一篇 arXiv 论文下载并【永久写进】本地论文库，要花几十秒到几分钟，
+   所以只在两种情况用：用户明确要求读某篇论文的全文；或者 search_arxiv 找到的那篇论文，
+   光靠标题和摘要回答不了、必须读正文。
+   下载完之后它的正文就已经在本地库里了 —— 接着用 query_corpus 去检索它，
+   不要再用 search_arxiv 重复找同一篇。
 """
 
 TOOLS_BY_NAME = {t.name: t for t in ALL_TOOLS}  # 名字 → 函数，方便按名字找
