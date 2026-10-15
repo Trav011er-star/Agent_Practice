@@ -350,11 +350,20 @@ ollama pull qwen2.5:3b          # 本地生成模型（走 DeepSeek 时用不到
 
 **2) Python 环境**：
 
+虚拟环境建在**仓库根目录**，`paper-agent` 和 `research-agent` 共用这一个
+（`torch` 装一份就够，没必要每个项目各来一遍）：
+
 ```bash
-python -m venv venv
-venv\Scripts\activate          # PowerShell: .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+cd ..                          # 到仓库根目录（Agent_Practice）
+python -m venv .venv
+.venv\Scripts\activate         # PowerShell: .\.venv\Scripts\Activate.ps1
+pip install -r paper-agent/requirements.txt
 ```
+
+之后在 `paper-agent/` 里跑东西，解释器用 `..\.venv\Scripts\python.exe`。
+
+> **VS Code 要打开仓库根目录**，不要打开 `paper-agent/` 子目录 ——
+> 解释器配置写在根目录的 `.vscode/settings.json` 里，打开子目录它不生效。
 
 > **装依赖很慢就换国内源。** `torch` 的 wheel 有 124 MB，
 > 实测官方源只有 191 KB/s（要 11 分钟），阿里云镜像有 800 KB/s（约 2.6 分钟）：
