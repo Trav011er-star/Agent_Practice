@@ -783,7 +783,7 @@ MCP 主要解决：
 目录：
 
 ```text
-paper-Agent/
+paper-agent/
 ```
 
 当前目标：
@@ -869,7 +869,7 @@ START → collect（检索） → judge（大模型判断证据够不够）
         MAX_HOPS 是刹车，防止 judge 一直判"不够"时无限循环
 ```
 
-> 完整说明、评测数据与踩坑记录见 [`paper-Agent/README.md`](paper-Agent/README.md)。
+> 完整说明、评测数据与踩坑记录见 [`paper-agent/README.md`](paper-agent/README.md)。
 
 ---
 
@@ -1129,7 +1129,7 @@ Relevant Context
 ### 截至 2026-10-10
 
 - [x] **Reranker** —— 召回 20 条后 cross-encoder 精排。实测发现"重排一定有用"是错的：
-      第一个模型是**负作用**，换英文对口的模型才涨（详见 `paper-Agent/README.md` 5.3）
+      第一个模型是**负作用**，换英文对口的模型才涨（详见 `paper-agent/README.md` 5.3）
 - [x] **Source Citation** —— 回答内嵌 `[论文名, p.页码]`，可追溯到片段级 `chunk_id`
 - [x] **混合检索** —— BM25 + 向量 + RRF，Recall@3 从 91.2% 提到 98.2%
 - [x] **LangGraph** —— 多跳 Agent 编排（`collect` / `judge` / `done` + 条件边 + 刹车）
@@ -1143,7 +1143,7 @@ Relevant Context
 
 随着项目继续开发，本章节会持续记录每一次新增功能、设计原因和实现过程。
 
-> 逐日进展与踩坑记录见 `paper-Agent/docs/worklog-*.md`。
+> 逐日进展与踩坑记录见 `paper-agent/docs/worklog-*.md`。
 
 ---
 

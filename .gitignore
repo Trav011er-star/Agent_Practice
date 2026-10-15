@@ -1,5 +1,12 @@
+# ---------- 教程资料（体积大，不纳入版本管理）----------
 Resource/hello-agents/
-# 环境变量，通常包含 API Key 等敏感信息
+
+# ---------- 密钥 / 环境变量 ----------
 .env
-.env
-.env
+
+# ---------- 虚拟环境 ----------
+# 2026-10-15 起统一放在仓库根目录，paper-agent 和 research-agent 共用这一个。
+# ⚠️ 这行必须留在【根】.gitignore 里：venv 以前藏在 paper-agent/ 下，
+#    靠 paper-agent/.gitignore 挡住；挪到根目录后只剩根这份能挡它。
+.venv/
+venv/

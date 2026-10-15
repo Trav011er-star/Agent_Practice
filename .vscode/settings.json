@@ -1,6 +1,7 @@
 {
-    // 钉死本仓库用的解释器 —— paper-Agent/venv 是标准库 venv
-    "python.defaultInterpreterPath": "E:\\Agent_Practice\\paper-Agent\\venv\\Scripts\\python.exe",
+    // 钉死本仓库用的解释器 —— 根目录 .venv 是标准库 venv，
+    // paper-agent 和 research-agent 共用这一个（2026-10-15 从 paper-agent/venv 挪上来的）
+    "python.defaultInterpreterPath": "E:\\Agent_Practice\\.venv\\Scripts\\python.exe",
     // 打开终端时自动激活上面这个环境
     "python.terminal.activateEnvironment": true
 }

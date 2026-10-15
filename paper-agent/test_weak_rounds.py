@@ -1,6 +1,6 @@
 """回归测试：检索「防雷」的两条停止条件。
 
-跑法（在 paper-Agent 目录下）：
+跑法（在 paper-agent 目录下）：
     ./venv/Scripts/python.exe test_weak_rounds.py
 
 和 test_api.py 一样是【脚本】，不是 pytest —— 直接跑，看打印。

@@ -54,15 +54,15 @@ import json
 # 手动把 agent/ 目录插到搜索路径最前面
 # ------------------------------------------------------------
 # 【为什么需要这行】
-#   api.py 在 paper-Agent/ 下，而 graph.py 在 paper-Agent/agent/ 下 —— 差一层。
+#   api.py 在 paper-agent/ 下，而 graph.py 在 paper-agent/agent/ 下 —— 差一层。
 #   Python 导入时只在【搜索路径】里找，"agent" 这个目录默认不在里面，
 #   所以 from graph import ... 会直接找不到。
 #
 # 【拆开读这行】
 #   __file__                  → 本文件（api.py）
 #   Path(__file__).resolve()  → 变成绝对路径
-#   .parent                   → 上一级目录 → E:\Agent_Practice\paper-Agent
-#   / "agent"                 → E:\Agent_Practice\paper-Agent\agent
+#   .parent                   → 上一级目录 → E:\Agent_Practice\paper-agent
+#   / "agent"                 → E:\Agent_Practice\paper-agent\agent
 #   sys.path.insert(0, …)     → 插到搜索路径【最前面】，优先找它
 #
 # 【为什么不写死 "E:\\Agent_Practice\\..."】

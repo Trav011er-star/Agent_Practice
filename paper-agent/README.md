@@ -183,7 +183,7 @@ START → collect（检索 + 去重） → judge（判断够不够）
 ### 4.4 目录结构
 
 ```text
-paper-Agent/
+paper-agent/
 ├── config.py              # 所有可调参数集中在此（含 LLM_PROVIDER 开关）
 ├── ingest.py              # 建库：PDF -> 分块 -> 向量化 -> Chroma
 ├── RAG_v1.py / RAG_v2.py  # 单轮 / 多轮 RAG
