@@ -11,7 +11,9 @@ from langchain_core.tools import tool
 import settings  # noqa: F401  （导入是为了副作用，不是为了用名字）
 from agent.engine import retrieve  # noqa: E402 —— 来自 paper-agent
 from settings import RETRIEVE_K  # noqa: E402
-
+import xml.etree.ElementTree as ET
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 # ---------------------------------------------------------------------------
 # 工具 1：query_corpus —— 在本地论文库里检索
@@ -64,5 +66,77 @@ def query_corpus(question: str) -> str:
     return "\n\n".join(result)
 
 
+# ---------------------------------------------------------------------------
+# 工具 2：联网 arxiv 查询
+# ---------------------------------------------------------------------------
+
+ARXIV_API = "https://export.arxiv.org/api/query"
+ARXIV_NS = {"a": "http://www.w3.org/2005/Atom"}
+ARXIV_MAX_RESULTS = 5  # 一次给几条
+ABSTRACT_CHARS = 500  # 摘要截到多少字，不能全给，prompt 太大了
+
+
+@tool
+def search_arxiv(query: str) -> str:
+    """在 arXiv 上检索论文，返回标题、作者、摘要开头和链接 —— 用来找【本地论文库没有】的论文。
+
+    什么时候用：本地论文库覆盖不到的问题 —— 更新的工作、别的方向，或者 query_corpus 说「没有找到」之后。
+    什么时候不该用：问题就在本地那 5 篇（BERT / GPT-2 / GPT-3 / Transformer 等）的范围内时，走 query_corpus；
+    闲聊、写代码直接回答即可，两个工具都不用调。
+    注意它只给标题和摘要开头，不给全文 —— 要读正文得先下载。
+
+    参数 query 用 arXiv 的查询语法：字段前缀 all:（全文）/ ti:（标题）/ abs:（摘要），
+    短语用引号，逻辑用 AND / OR，例如 ti:"chain of thought"、all:diffusion AND abs:survey。
+    不写字段前缀时会自动按 all: 处理，所以只给关键词也能用。
+    """
+    # ① 没带字段前缀就按全文检索
+    if ":" not in query:
+        query = f"all:{query}"
+
+    # ② 拼 URL
+    params = urlencode({"search_query": query, "max_results": ARXIV_MAX_RESULTS})
+    url = f"{ARXIV_API}?{params}"
+
+    # ③ 请求 + 兜底 —— 失败必须【返回一句话】，不能抛
+    try:
+        with urlopen(url, timeout=20) as resp:
+            raw = resp.read()
+    except Exception as exc:
+        return f"arXiv 检索失败（{type(exc).__name__}: {exc}）。可以只依据本地论文"
+
+    # ④ 解析
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        return f"arXiv 返回的内容解析不了（{exc}）。可以只依据本地论文库回答。"
+
+    entries = root.findall("a:entry", ARXIV_NS)
+    if not entries:
+        return f"arXiv 上没有搜到和「{query}」相关的论文。"
+
+    # ⑤ 逐条拼
+    pieces = []
+    for entry in entries:
+        arxiv_id = entry.find("a:id", ARXIV_NS).text.rsplit("/", 1)[-1]
+        title = entry.find("a:title", ARXIV_NS).text.strip()
+        summary = entry.find("a:summary", ARXIV_NS).text.strip()
+        if len(summary) > ABSTRACT_CHARS:
+            summary = summary[:ABSTRACT_CHARS] + "…"
+        names = [
+            a.find("a:name", ARXIV_NS).text for a in entry.findall("a:author", ARXIV_NS)
+        ]
+        authors = "、".join(names[:3]) + (" 等" if len(names) > 3 else "")
+        published = entry.find("a:published", ARXIV_NS).text[:10]
+        pieces.append(
+            f"[arXiv:{arxiv_id}] {title}\n"
+            f"  作者：{authors}（{published}）\n"
+            f"  摘要：{summary}"
+        )
+
+    total = root.find("{http://a9.com/-/spec/opensearch/1.1/}totalResults")
+    head = f"arXiv 共命中 {total.text} 篇，下面是相关度最高的 {len(entries)} 篇："
+    return head + "\n\n" + "\n\n".join(pieces)
+
+
 # 所有工具的清单 —— 将来加工具，只改这一行
-ALL_TOOLS = [query_corpus]
+ALL_TOOLS = [query_corpus, search_arxiv]
