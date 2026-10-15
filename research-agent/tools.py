@@ -8,30 +8,47 @@
 """
 
 from langchain_core.tools import tool
-
-from agent.engine import retrieve          # ← 来自 paper-agent（靠 settings.py 搭的桥）
-from settings import RETRIEVE_K
+import settings  # noqa: F401  （导入是为了副作用，不是为了用名字）
+from agent.engine import retrieve  # noqa: E402 —— 来自 paper-agent
+from settings import RETRIEVE_K  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
 # 工具 1：query_corpus —— 在本地论文库里检索
 # ---------------------------------------------------------------------------
+# bind_tools 干的全部事情，就是往请求体里多塞一个字段:
+#   "tools": [
+#     {
+#       "type": "function",
+#       "function": {
+#         "name": "query_corpus",
+#         "description": "在本地 LLM 论文库里做语义检索，返回最相关的原文片段，每条都带
+#   [论文名, p.页码]出处。\n\n什么时候用：...",
+#         "parameters": {
+#           "properties": { "question": { "type": "string" } },
+#           "required": ["question"],
+#           "type": "object"
+#         }
+#       }
+#     }
+#   ]
+# ---------------------------------------------------------------------------
+
+
 @tool
 def query_corpus(question: str) -> str:
-    """TODO(你写)：这段 docstring 就是模型唯一能看到的"说明书"。
+    # 这个是给大模型看的工具使用说明，模型调用函数时可以看见
+    # 这里算是给 LLM 在解决问题时的提示词， LLM 优先调用工具
+    """在本地 LLM 论文库里做语义检索，返回最相关的原文片段，每条都带 [论文名, p.页码] 出处。
 
-    它写得好不好，直接决定模型【调不调】、【参数填得对不对】。
-    要交代清楚三件事：
-      1. 这个工具能干什么        —— 在本地论文库（5 篇 LLM 论文）里检索原文片段
-      2. 什么时候该用它          —— 问论文里的方法 / 数字 / 结论 / 对比时
-      3. 什么时候【不该】用它    —— 闲聊、写代码、问最新新闻（库里没有）
+    什么时候用：问题涉及这 5 篇论文的方法、结构、实验数字、结论，或它们之间的对比时。
+    什么时候不该用：闲聊、写代码、问时效性新闻，或论文库覆盖不到的主题 —— 直接回答即可，不要调用。
 
-    第 3 条最容易被忽略：不写清楚"不该用"的边界，
-    模型会在你问"今天天气"时也去翻论文库，然后拿一堆无关片段硬编。
+    参数 question 请填一个完整的自然语言问句（例如「BERT 和 GPT-3 的预训练目标有什么区别？」），
+    不要只写几个关键词 —— 检索器是按语义匹配的，问句越完整，召回越准。
     """
-    # TODO(你写)：真正去检索，并把这批片段拼成一个【字符串】返回。
-    #
-    #   docs = retrieve(question, k=RETRIEVE_K)
+    # 检索并把这批片段拼成一个【字符串】返回。
+    docs = retrieve(question, k=RETRIEVE_K)
     #
     # 每个 doc 可用的 metadata：
     #   doc.metadata["paper"] → 论文名（如 "BERT"）
@@ -40,10 +57,11 @@ def query_corpus(question: str) -> str:
     #
     # 拼的时候【必须】带上出处，形如：[BERT, p.3]
     # 否则模型没法在最终答案里引用，你也就没法验证它是不是编的。
-    #
-    # ⚠️ 返回值是给【模型】读的，不是给人读的：
-    #    不要 print，不要塞调试信息，别让噪音挤占上下文。
-    raise NotImplementedError
+    result = []
+    for doc in docs:
+        piece = f"[{doc.metadata['paper']}, p.{doc.metadata['page'] + 1}] {doc.page_content}"
+        result.append(piece)
+    return "\n\n".join(result)
 
 
 # 所有工具的清单 —— 将来加工具，只改这一行

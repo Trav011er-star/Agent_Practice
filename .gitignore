@@ -10,3 +10,8 @@ Resource/hello-agents/
 #    靠 paper-agent/.gitignore 挡住；挪到根目录后只剩根这份能挡它。
 .venv/
 venv/
+
+# ---------- Python 字节码缓存 ----------
+# research-agent 没有自己的 .gitignore，靠这一行挡住。
+__pycache__/
+*.py[cod]
